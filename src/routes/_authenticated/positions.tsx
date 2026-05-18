@@ -142,6 +142,19 @@ function PositionsPage() {
           >
             {importM.isPending ? "Importing…" : "↑ Upload CSV"}
           </button>
+          <a
+            href={`data:text/csv;charset=utf-8,${encodeURIComponent(
+              `ticker,name,asset_type,market,currency,shares,avg_cost,portfolio,notes\n` +
+              `AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR,\n` +
+              `AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro,\n` +
+              `VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR,\n` +
+              `BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase,long term\n`
+            )}`}
+            download="positions-template.csv"
+            className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
+          >
+            ↓ Template
+          </a>
           <button
             onClick={() => setEditing({ ...empty })}
             className="bg-primary text-primary-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
@@ -156,13 +169,16 @@ function PositionsPage() {
           CSV format help
         </summary>
         <div className="px-3 pb-3 text-muted-foreground space-y-1">
-          <p>Required columns: <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
-          <p>Optional: <code>name</code>, <code>asset_type</code>, <code>market</code>, <code>currency</code>, <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Required columns:</strong> <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
+          <p><strong className="text-foreground">Optional columns:</strong> <code>name</code>, <code>asset_type</code> (stock/etf/crypto/bond/fund/other), <code>market</code> (NASDAQ, NYSE, LSE, EPA, …), <code>currency</code> (USD, EUR, GBP, …), <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Tickers:</strong> use Yahoo Finance symbols — <code>AAPL</code>, <code>AIR.PA</code>, <code>VOD.L</code>, <code>BTC-USD</code>.</p>
+          <p><strong className="text-foreground">Portfolios:</strong> the <code>portfolio</code> column auto-creates portfolios by name. Each row's <code>currency</code> is independent, so one portfolio can hold positions in multiple currencies.</p>
           <p>Aliases accepted: symbol→ticker, qty/quantity→shares, cost/price→avg_cost, broker/account/platform→portfolio.</p>
-          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,shares,avg_cost,currency,portfolio
-AAPL,10,150.20,USD,IBKR
-MSFT,5,310.00,USD,IBKR
-BTC-USD,0.5,45000,USD,Coinbase`}</pre>
+          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,name,asset_type,market,currency,shares,avg_cost,portfolio
+AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR
+AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro
+VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR
+BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
         </div>
       </details>
 
