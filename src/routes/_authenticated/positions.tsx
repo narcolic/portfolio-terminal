@@ -366,14 +366,13 @@ function EditModal({
 function PortfoliosModal({
   portfolios, onClose, onCreate, onDelete,
 }: {
-  portfolios: { id: string; name: string; broker: string | null; currency: string }[];
+  portfolios: { id: string; name: string; broker: string | null }[];
   onClose: () => void;
   onCreate: (v: PortfolioInputType) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [broker, setBroker] = useState("");
-  const [currency, setCurrency] = useState("USD");
 
   return (
     <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur flex items-start md:items-center justify-center p-4 overflow-y-auto">
@@ -383,11 +382,14 @@ function PortfoliosModal({
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
         </div>
         <div className="p-4 space-y-4">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Portfolios are multi-currency. Currency is set per position.
+          </p>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               if (!name.trim()) return;
-              await onCreate({ name: name.trim(), broker: broker.trim() || null, currency });
+              await onCreate({ name: name.trim(), broker: broker.trim() || null });
               setName(""); setBroker("");
             }}
             className="grid grid-cols-2 gap-2"
@@ -400,14 +402,8 @@ function PortfoliosModal({
             <input
               value={broker} onChange={(e) => setBroker(e.target.value)}
               placeholder="Broker (optional)"
-              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+              className="col-span-2 bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
             />
-            <select
-              value={currency} onChange={(e) => setCurrency(e.target.value)}
-              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
-            >
-              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
             <button
               type="submit"
               className="col-span-2 bg-primary text-primary-foreground px-3 py-1.5 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
@@ -425,7 +421,7 @@ function PortfoliosModal({
                 <div>
                   <div className="font-bold">{p.name}</div>
                   <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                    {p.broker || "—"} · {p.currency}
+                    {p.broker || "—"}
                   </div>
                 </div>
                 <button
