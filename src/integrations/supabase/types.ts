@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      portfolios: {
+        Row: {
+          broker: string | null
+          created_at: string
+          currency: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          broker?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          broker?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
           asset_type: string
@@ -24,6 +57,7 @@ export type Database = {
           market: string | null
           name: string | null
           notes: string | null
+          portfolio_id: string | null
           shares: number
           ticker: string
           updated_at: string
@@ -38,6 +72,7 @@ export type Database = {
           market?: string | null
           name?: string | null
           notes?: string | null
+          portfolio_id?: string | null
           shares: number
           ticker: string
           updated_at?: string
@@ -52,12 +87,21 @@ export type Database = {
           market?: string | null
           name?: string | null
           notes?: string | null
+          portfolio_id?: string | null
           shares?: number
           ticker?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "positions_portfolio_id_fkey"
+            columns: ["portfolio_id"]
+            isOneToOne: false
+            referencedRelation: "portfolios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
