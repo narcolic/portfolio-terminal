@@ -84,7 +84,7 @@ function PositionsPage() {
         rows.map((r) => r.portfolio?.trim()).filter((n): n is string => !!n && !nameToId.has(n.toLowerCase()))
       ));
       for (const n of newNames) {
-        const p = await createP({ data: { name: n, currency: "USD" } });
+        const p = await createP({ data: { name: n } });
         nameToId.set(n.toLowerCase(), p.id);
       }
 
@@ -142,6 +142,19 @@ function PositionsPage() {
           >
             {importM.isPending ? "Importing…" : "↑ Upload CSV"}
           </button>
+          <a
+            href={`data:text/csv;charset=utf-8,${encodeURIComponent(
+              `ticker,name,asset_type,market,currency,shares,avg_cost,portfolio,notes\n` +
+              `AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR,\n` +
+              `AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro,\n` +
+              `VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR,\n` +
+              `BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase,long term\n`
+            )}`}
+            download="positions-template.csv"
+            className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
+          >
+            ↓ Template
+          </a>
           <button
             onClick={() => setEditing({ ...empty })}
             className="bg-primary text-primary-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
@@ -156,13 +169,16 @@ function PositionsPage() {
           CSV format help
         </summary>
         <div className="px-3 pb-3 text-muted-foreground space-y-1">
-          <p>Required columns: <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
-          <p>Optional: <code>name</code>, <code>asset_type</code>, <code>market</code>, <code>currency</code>, <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Required columns:</strong> <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
+          <p><strong className="text-foreground">Optional columns:</strong> <code>name</code>, <code>asset_type</code> (stock/etf/crypto/bond/fund/other), <code>market</code> (NASDAQ, NYSE, LSE, EPA, …), <code>currency</code> (USD, EUR, GBP, …), <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Tickers:</strong> use Yahoo Finance symbols — <code>AAPL</code>, <code>AIR.PA</code>, <code>VOD.L</code>, <code>BTC-USD</code>.</p>
+          <p><strong className="text-foreground">Portfolios:</strong> the <code>portfolio</code> column auto-creates portfolios by name. Each row's <code>currency</code> is independent, so one portfolio can hold positions in multiple currencies.</p>
           <p>Aliases accepted: symbol→ticker, qty/quantity→shares, cost/price→avg_cost, broker/account/platform→portfolio.</p>
-          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,shares,avg_cost,currency,portfolio
-AAPL,10,150.20,USD,IBKR
-MSFT,5,310.00,USD,IBKR
-BTC-USD,0.5,45000,USD,Coinbase`}</pre>
+          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,name,asset_type,market,currency,shares,avg_cost,portfolio
+AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR
+AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro
+VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR
+BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
         </div>
       </details>
 
@@ -366,14 +382,13 @@ function EditModal({
 function PortfoliosModal({
   portfolios, onClose, onCreate, onDelete,
 }: {
-  portfolios: { id: string; name: string; broker: string | null; currency: string }[];
+  portfolios: { id: string; name: string; broker: string | null }[];
   onClose: () => void;
   onCreate: (v: PortfolioInputType) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [broker, setBroker] = useState("");
-  const [currency, setCurrency] = useState("USD");
 
   return (
     <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur flex items-start md:items-center justify-center p-4 overflow-y-auto">
@@ -383,11 +398,14 @@ function PortfoliosModal({
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
         </div>
         <div className="p-4 space-y-4">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Portfolios are multi-currency. Currency is set per position.
+          </p>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               if (!name.trim()) return;
-              await onCreate({ name: name.trim(), broker: broker.trim() || null, currency });
+              await onCreate({ name: name.trim(), broker: broker.trim() || null });
               setName(""); setBroker("");
             }}
             className="grid grid-cols-2 gap-2"
@@ -400,14 +418,8 @@ function PortfoliosModal({
             <input
               value={broker} onChange={(e) => setBroker(e.target.value)}
               placeholder="Broker (optional)"
-              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+              className="col-span-2 bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
             />
-            <select
-              value={currency} onChange={(e) => setCurrency(e.target.value)}
-              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
-            >
-              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
             <button
               type="submit"
               className="col-span-2 bg-primary text-primary-foreground px-3 py-1.5 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
@@ -425,7 +437,7 @@ function PortfoliosModal({
                 <div>
                   <div className="font-bold">{p.name}</div>
                   <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                    {p.broker || "—"} · {p.currency}
+                    {p.broker || "—"}
                   </div>
                 </div>
                 <button

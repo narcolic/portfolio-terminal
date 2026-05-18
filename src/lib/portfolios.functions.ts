@@ -5,7 +5,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const PortfolioInput = z.object({
   name: z.string().trim().min(1).max(80),
   broker: z.string().trim().max(80).optional().nullable(),
-  currency: z.string().trim().min(3).max(5).default("USD"),
   notes: z.string().trim().max(500).optional().nullable(),
 });
 
