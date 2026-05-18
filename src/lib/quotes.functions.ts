@@ -82,8 +82,8 @@ async function resolveSymbol(input: string): Promise<string> {
 async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSymbol"> | null> {
   const encoded = encodeURIComponent(symbol);
   const urls = [
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`,
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1m`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1m`,
   ];
   let res: Response | null = null;
   for (const url of urls) {
