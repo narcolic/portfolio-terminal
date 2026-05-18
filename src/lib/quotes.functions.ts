@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import yahooFinance from "yahoo-finance2";
+
+// Suppress survey notice + schema validation warnings (Yahoo occasionally adds fields)
+yahooFinance.suppressNotices(["yahooSurvey"]);
+yahooFinance.setGlobalConfig({ validation: { logErrors: false, logOptionsErrors: false } });
 
 const QuoteInput = z.object({
-  symbols: z.array(z.string().min(1).max(20)).min(1).max(100),
+  symbols: z.array(z.string().min(1).max(32)).min(1).max(100),
 });
 
 export interface Quote {
@@ -23,55 +28,34 @@ const QUOTE_CACHE = new Map<string, CachedQ>();
 const TTL_MS = 60_000;
 const STALE_MS = 30 * 60_000;
 
-function parseTd(symbol: string, input: string, raw: any): Quote | null {
-  if (!raw || raw.status === "error") return null;
-  const price = Number(raw.close ?? raw.price);
-  const prev = Number(raw.previous_close ?? price);
+function normalize(input: string, raw: any): Quote | null {
+  if (!raw) return null;
+  const price = Number(raw.regularMarketPrice);
   if (!Number.isFinite(price)) return null;
+  const prev = Number(raw.regularMarketPreviousClose ?? price);
   const rawCur = String(raw.currency ?? "USD").toUpperCase();
+  // LSE pence → GBP
   const isPence = rawCur === "GBP" && price > 1000;
   const p = isPence ? price / 100 : price;
   const pp = isPence ? prev / 100 : prev;
   const change = p - pp;
   return {
-    symbol: String(raw.symbol ?? symbol).toUpperCase(),
+    symbol: String(raw.symbol ?? input).toUpperCase(),
     inputSymbol: input.toUpperCase(),
-    shortName: raw.name,
+    shortName: raw.shortName ?? raw.longName,
     regularMarketPrice: p,
     regularMarketPreviousClose: pp,
     regularMarketChange: change,
     regularMarketChangePercent: pp ? (change / pp) * 100 : 0,
     currency: isPence ? "GBP" : rawCur,
-    exchange: raw.exchange,
-    marketState: raw.is_market_open === false ? "CLOSED" : "REGULAR",
+    exchange: raw.fullExchangeName ?? raw.exchange,
+    marketState: raw.marketState,
   };
-}
-
-async function fetchBatch(symbols: string[], apiKey: string): Promise<Map<string, any>> {
-  const out = new Map<string, any>();
-  if (symbols.length === 0) return out;
-  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(
-    symbols.join(","),
-  )}&apikey=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) return out;
-  const json: any = await res.json().catch(() => null);
-  if (!json) return out;
-  // Single-symbol responses are flat; multi-symbol are keyed by symbol.
-  if (symbols.length === 1) {
-    out.set(symbols[0].toUpperCase(), json);
-  } else {
-    for (const [k, v] of Object.entries(json)) out.set(k.toUpperCase(), v);
-  }
-  return out;
 }
 
 export const getQuotes = createServerFn({ method: "POST" })
   .inputValidator((input) => QuoteInput.parse(input))
   .handler(async ({ data }): Promise<{ quotes: Quote[]; error: string | null }> => {
-    const apiKey = process.env.TWELVEDATA_API_KEY;
-    if (!apiKey) return { quotes: [], error: "TWELVEDATA_API_KEY not configured" };
-
     const now = Date.now();
     const need: string[] = [];
     const cached = new Map<string, Quote>();
@@ -82,18 +66,22 @@ export const getQuotes = createServerFn({ method: "POST" })
       else need.push(up);
     }
 
-    let raw = new Map<string, any>();
+    let raw: any[] = [];
     let fetchErr = false;
-    try {
-      // Twelve Data free tier: 8 req/min — batch in chunks of ~30 symbols
-      const chunks: string[][] = [];
-      for (let i = 0; i < need.length; i += 30) chunks.push(need.slice(i, i + 30));
-      for (const c of chunks) {
-        const m = await fetchBatch(c, apiKey);
-        for (const [k, v] of m) raw.set(k, v);
+    if (need.length > 0) {
+      try {
+        const res = await yahooFinance.quote(need, { return: "array" } as any);
+        raw = Array.isArray(res) ? res : [res];
+      } catch (e) {
+        console.error("yahoo-finance2 quote failed:", e);
+        fetchErr = true;
       }
-    } catch {
-      fetchErr = true;
+    }
+
+    const byInput = new Map<string, any>();
+    for (const r of raw) {
+      const sym = String(r?.symbol ?? "").toUpperCase();
+      if (sym) byInput.set(sym, r);
     }
 
     const quotes: Quote[] = [];
@@ -104,7 +92,7 @@ export const getQuotes = createServerFn({ method: "POST" })
         quotes.push(cached.get(up)!);
         continue;
       }
-      const q = parseTd(up, up, raw.get(up));
+      const q = normalize(up, byInput.get(up));
       if (q) {
         QUOTE_CACHE.set(up, { quote: q, ts: now });
         quotes.push(q);
