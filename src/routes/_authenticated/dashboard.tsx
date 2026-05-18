@@ -165,6 +165,13 @@ function Dashboard() {
             })}
           </div>
         </div>
+        <button
+          onClick={() => quotesQ.refetch()}
+          disabled={quotesQ.isFetching || tickers.length === 0}
+          className="border border-border bg-card px-4 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
+        >
+          {quotesQ.isFetching ? "syncing…" : "↻ sync"}
+        </button>
         <div className="border border-border bg-card flex">
           {(["USD", "EUR"] as Display[]).map((c) => (
             <button
