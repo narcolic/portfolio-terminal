@@ -35,6 +35,7 @@ function TransactionsPage() {
   const create = useServerFn(createPosition);
   const update = useServerFn(updatePosition);
   const del = useServerFn(deletePosition);
+  const bulkDel = useServerFn(bulkDeletePositions);
   const bulk = useServerFn(bulkImportPositions);
   const listP = useServerFn(listPortfolios);
   const createP = useServerFn(createPortfolio);
