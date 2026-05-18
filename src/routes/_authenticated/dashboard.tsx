@@ -48,7 +48,7 @@ function Dashboard() {
     queryKey: ["quotes", tickers],
     queryFn: () => fetchQuotes({ data: { symbols: tickers } }),
     enabled: tickers.length > 0,
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
   });
 
