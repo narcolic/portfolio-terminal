@@ -255,6 +255,18 @@ function Dashboard() {
   );
 }
 
+function computeTotals(rows: Enriched[]) {
+  const mv = rows.reduce((s, r) => s + r.marketValue, 0);
+  const cost = rows.reduce((s, r) => s + r.costBasis, 0);
+  const dayChange = rows.reduce((s, r) => s + r.dayChange, 0);
+  const unrealized = mv - cost;
+  return {
+    mv, cost, dayChange, unrealized,
+    dayPct: mv - dayChange ? (dayChange / (mv - dayChange)) * 100 : 0,
+    unrealizedPct: cost ? (unrealized / cost) * 100 : 0,
+  };
+}
+
 function groupSum(rows: Enriched[], key: (r: Enriched) => string) {
   const m = new Map<string, number>();
   for (const r of rows) m.set(key(r), (m.get(key(r)) ?? 0) + r.marketValue);
