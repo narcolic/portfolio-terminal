@@ -84,7 +84,7 @@ function PositionsPage() {
         rows.map((r) => r.portfolio?.trim()).filter((n): n is string => !!n && !nameToId.has(n.toLowerCase()))
       ));
       for (const n of newNames) {
-        const p = await createP({ data: { name: n, currency: "USD" } });
+        const p = await createP({ data: { name: n } });
         nameToId.set(n.toLowerCase(), p.id);
       }
 
