@@ -16,9 +16,7 @@ dist-ssr
 .nitro
 *.local
 
-# Wrangler / Cloudflare
-.wrangler/
-.dev.vars
+# Wrangler / Cloudflare (removed) - no Cloudflare deploy targets remain
 
 # Editor directories and files
 .vscode/*
