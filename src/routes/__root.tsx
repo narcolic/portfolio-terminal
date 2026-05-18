@@ -11,6 +11,7 @@ import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
+import { Toaster } from "sonner";
 
 function NotFoundComponent() {
   return (
@@ -109,6 +110,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthBridge />
       <Outlet />
+      <Toaster theme="dark" position="top-right" toastOptions={{ style: { background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)", fontFamily: "var(--font-mono)" } }} />
     </QueryClientProvider>
   );
 }
