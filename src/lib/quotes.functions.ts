@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import yahooFinance from "yahoo-finance2";
 
-// Suppress survey notice + schema validation warnings (Yahoo occasionally adds fields)
-(yahooFinance as any).suppressNotices?.(["yahooSurvey"]);
-(yahooFinance as any).setGlobalConfig?.({ validation: { logErrors: false, logOptionsErrors: false } });
 
 const QuoteInput = z.object({
   symbols: z.array(z.string().min(1).max(32)).min(1).max(100),
@@ -70,8 +66,8 @@ export const getQuotes = createServerFn({ method: "POST" })
     let fetchErr = false;
     if (need.length > 0) {
       try {
-        const res = await yahooFinance.quote(need, { return: "array" } as any);
-        raw = Array.isArray(res) ? res : [res];
+        const { fetchYahooQuotes } = await import("./yahoo.server");
+        raw = await fetchYahooQuotes(need);
       } catch (e) {
         console.error("yahoo-finance2 quote failed:", e);
         fetchErr = true;
