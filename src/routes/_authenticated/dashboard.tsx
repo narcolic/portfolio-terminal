@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { listPositions } from "@/lib/positions.functions";
+import { listPortfolios } from "@/lib/portfolios.functions";
 import { getQuotes } from "@/lib/quotes.functions";
-import { enrich, fmt, fmtCurrency, fmtPct, type Enriched } from "@/lib/portfolio";
+import { enrich, fmt, fmtCurrency, fmtPct, type Enriched, type PositionRow } from "@/lib/portfolio";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
 } from "recharts";
@@ -13,14 +14,26 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+type PositionWithPortfolio = PositionRow & { portfolio_id: string | null };
+
+const ALL = "__all__";
+const UNASSIGNED = "__unassigned__";
+
 function Dashboard() {
   const list = useServerFn(listPositions);
+  const listP = useServerFn(listPortfolios);
   const fetchQuotes = useServerFn(getQuotes);
 
   const positionsQ = useQuery({
     queryKey: ["positions"],
     queryFn: () => list(),
   });
+  const portfoliosQ = useQuery({
+    queryKey: ["portfolios"],
+    queryFn: () => listP(),
+  });
+
+  const [selected, setSelected] = useState<string>(ALL);
 
   const tickers = useMemo(
     () => Array.from(new Set((positionsQ.data ?? []).map((p) => p.ticker.toUpperCase()))),
@@ -35,22 +48,46 @@ function Dashboard() {
     refetchOnWindowFocus: true,
   });
 
-  const rows: Enriched[] = useMemo(
-    () => enrich(positionsQ.data ?? [], quotesQ.data?.quotes ?? []),
+  const allRows = useMemo(
+    () => enrich(
+      (positionsQ.data ?? []) as PositionWithPortfolio[],
+      quotesQ.data?.quotes ?? [],
+    ) as (Enriched & { portfolio_id: string | null })[],
     [positionsQ.data, quotesQ.data],
   );
 
-  const totals = useMemo(() => {
-    const mv = rows.reduce((s, r) => s + r.marketValue, 0);
-    const cost = rows.reduce((s, r) => s + r.costBasis, 0);
-    const dayChange = rows.reduce((s, r) => s + r.dayChange, 0);
-    const unrealized = mv - cost;
-    return {
-      mv, cost, dayChange, unrealized,
-      dayPct: mv - dayChange ? (dayChange / (mv - dayChange)) * 100 : 0,
-      unrealizedPct: cost ? (unrealized / cost) * 100 : 0,
-    };
-  }, [rows]);
+  const rows = useMemo(() => {
+    if (selected === ALL) return allRows;
+    if (selected === UNASSIGNED) return allRows.filter((r) => !r.portfolio_id);
+    return allRows.filter((r) => r.portfolio_id === selected);
+  }, [allRows, selected]);
+
+  const portfolioMap = useMemo(
+    () => new Map((portfoliosQ.data ?? []).map((p) => [p.id, p.name])),
+    [portfoliosQ.data],
+  );
+
+  const totals = useMemo(() => computeTotals(rows), [rows]);
+
+  // Per-portfolio breakdown (always against ALL rows, independent of filter)
+  const byPortfolio = useMemo(() => {
+    const groups = new Map<string, (Enriched & { portfolio_id: string | null })[]>();
+    for (const r of allRows) {
+      const key = r.portfolio_id ?? UNASSIGNED;
+      const arr = groups.get(key) ?? [];
+      arr.push(r);
+      groups.set(key, arr);
+    }
+    return Array.from(groups, ([id, items]) => {
+      const t = computeTotals(items);
+      return {
+        id,
+        name: id === UNASSIGNED ? "Unassigned" : portfolioMap.get(id) ?? "—",
+        count: items.length,
+        ...t,
+      };
+    }).sort((a, b) => b.mv - a.mv);
+  }, [allRows, portfolioMap]);
 
   const byType = useMemo(() => groupSum(rows, (r) => r.asset_type), [rows]);
   const byMarket = useMemo(
