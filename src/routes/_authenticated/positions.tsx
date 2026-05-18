@@ -46,6 +46,7 @@ function TransactionsPage() {
 
   const [editing, setEditing] = useState<(TransactionInputType & { id?: string }) | null>(null);
   const [showPortfolios, setShowPortfolios] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   const portfolioName = useMemo(() => {
