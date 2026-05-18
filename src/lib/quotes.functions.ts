@@ -97,8 +97,12 @@ async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSym
     if (!r) return null;
     const m = r.meta ?? {};
     const closes = (r.indicators?.quote?.[0]?.close ?? []).filter((v: unknown) => Number.isFinite(Number(v)));
-    const price = Number(m.regularMarketPrice ?? closes.at(-1));
-    const prev = Number(m.chartPreviousClose ?? m.previousClose ?? closes.at(-2) ?? price);
+    const rawPrice = Number(m.regularMarketPrice ?? closes.at(-1));
+    const rawPrev = Number(m.chartPreviousClose ?? m.previousClose ?? closes.at(-2) ?? rawPrice);
+    const yahooCurrency = String(m.currency ?? "USD");
+    const isPence = yahooCurrency.toUpperCase() === "GBP" && rawPrice > 1000 || yahooCurrency.toUpperCase() === "GBX" || yahooCurrency === "GBp";
+    const price = isPence ? rawPrice / 100 : rawPrice;
+    const prev = isPence ? rawPrev / 100 : rawPrev;
     if (!Number.isFinite(price)) return null;
     const change = price - prev;
     return {
@@ -108,7 +112,7 @@ async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSym
       regularMarketPreviousClose: prev,
       regularMarketChange: change,
       regularMarketChangePercent: prev ? (change / prev) * 100 : 0,
-      currency: m.currency ?? "USD",
+      currency: isPence ? "GBP" : yahooCurrency,
       exchange: m.exchangeName ?? m.fullExchangeName,
       marketState: m.marketState,
     };
