@@ -27,29 +27,53 @@ export function parseCSV(text: string): string[][] {
 const ALIASES: Record<string, string> = {
   symbol: "ticker", code: "ticker", isin: "ticker", security: "ticker",
   qty: "shares", quantity: "shares", units: "shares", position: "shares",
-  cost: "avg_cost", "avg cost": "avg_cost", "average cost": "avg_cost",
-  "cost basis": "avg_cost", "buy price": "avg_cost", price: "avg_cost",
+  cost: "price", "avg_cost": "price", "avg cost": "price", "average cost": "price",
+  "cost basis": "price", "buy price": "price", "unit price": "price",
   type: "asset_type", category: "asset_type", "asset type": "asset_type",
   exchange: "market", venue: "market",
   ccy: "currency",
   description: "name", label: "name",
   portfolio: "portfolio", broker: "portfolio", account: "portfolio", platform: "portfolio",
+  date: "transaction_date", "trade date": "transaction_date",
+  "transaction date": "transaction_date", "trade_date": "transaction_date",
+  "transactiondate": "transaction_date",
 };
 
-export type CsvPositionRow = {
+export type CsvTransactionRow = {
   ticker: string;
   name?: string;
   asset_type?: string;
   market?: string;
   currency?: string;
   shares: number;
-  avg_cost: number;
+  price: number;
+  transaction_date: string; // YYYY-MM-DD
   notes?: string;
   portfolio?: string;
 };
 
+function normalizeDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  // YYYY-MM-DD or YYYY/MM/DD
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  // DD/MM/YYYY or DD-MM-YYYY (assume day first for European exports)
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  // Fallback Date.parse
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${da}`;
+  }
+  return null;
+}
+
 export function mapCsvRows(rows: string[][]): {
-  rows: CsvPositionRow[];
+  rows: CsvTransactionRow[];
   errors: string[];
 } {
   if (rows.length < 2) return { rows: [], errors: ["CSV is empty or missing header row"] };
@@ -58,12 +82,13 @@ export function mapCsvRows(rows: string[][]): {
     return ALIASES[k] ?? k.replace(/\s+/g, "_");
   });
   const idx = (k: string) => header.indexOf(k);
-  const required = ["ticker", "shares"];
+  const required = ["ticker", "shares", "price"];
   const missing = required.filter((k) => idx(k) === -1);
   if (missing.length) return { rows: [], errors: [`Missing required column(s): ${missing.join(", ")}`] };
 
   const errors: string[] = [];
-  const out: CsvPositionRow[] = [];
+  const out: CsvTransactionRow[] = [];
+  const today = new Date().toISOString().slice(0, 10);
   for (let r = 1; r < rows.length; r++) {
     const cells = rows[r];
     const get = (k: string) => {
@@ -72,11 +97,14 @@ export function mapCsvRows(rows: string[][]): {
     };
     const ticker = get("ticker").toUpperCase();
     const sharesN = Number(get("shares").replace(/,/g, ""));
-    const avg = Number((get("avg_cost") || "0").replace(/,/g, "")) || 0;
+    const priceN = Number((get("price") || "0").replace(/,/g, "")) || 0;
+    const rawDate = get("transaction_date");
+    const date = rawDate ? normalizeDate(rawDate) : today;
     if (!ticker) { errors.push(`Row ${r + 1}: missing ticker`); continue; }
-    if (!Number.isFinite(sharesN) || sharesN < 0) {
+    if (!Number.isFinite(sharesN) || sharesN <= 0) {
       errors.push(`Row ${r + 1}: invalid shares "${get("shares")}"`); continue;
     }
+    if (!date) { errors.push(`Row ${r + 1}: invalid date "${rawDate}"`); continue; }
     out.push({
       ticker,
       name: get("name") || undefined,
@@ -84,7 +112,8 @@ export function mapCsvRows(rows: string[][]): {
       market: get("market") || undefined,
       currency: (get("currency") || "USD").toUpperCase(),
       shares: sharesN,
-      avg_cost: avg,
+      price: priceN,
+      transaction_date: date,
       notes: get("notes") || undefined,
       portfolio: get("portfolio") || undefined,
     });

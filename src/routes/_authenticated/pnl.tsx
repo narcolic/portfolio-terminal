@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
 import { listPositions } from "@/lib/positions.functions";
 import { getQuotes } from "@/lib/quotes.functions";
-import { enrich, fmt, fmtCurrency, fmtPct } from "@/lib/portfolio";
+import { aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct, type TransactionRow } from "@/lib/portfolio";
 
 export const Route = createFileRoute("/_authenticated/pnl")({
   component: PnL,
@@ -14,10 +14,14 @@ function PnL() {
   const list = useServerFn(listPositions);
   const fetchQuotes = useServerFn(getQuotes);
 
-  const posQ = useQuery({ queryKey: ["positions"], queryFn: () => list() });
+  const txQ = useQuery({ queryKey: ["positions"], queryFn: () => list() });
+  const positions = useMemo(
+    () => aggregateTransactions((txQ.data ?? []) as TransactionRow[]),
+    [txQ.data],
+  );
   const tickers = useMemo(
-    () => Array.from(new Set((posQ.data ?? []).map((p) => p.ticker.toUpperCase()))),
-    [posQ.data],
+    () => Array.from(new Set(positions.map((p) => p.ticker.toUpperCase()))),
+    [positions],
   );
   const quotesQ = useQuery({
     queryKey: ["quotes", tickers],
@@ -27,9 +31,9 @@ function PnL() {
   });
 
   const rows = useMemo(
-    () => enrich(posQ.data ?? [], quotesQ.data?.quotes ?? [])
+    () => enrich(positions, quotesQ.data?.quotes ?? [])
       .sort((a, b) => b.unrealized - a.unrealized),
-    [posQ.data, quotesQ.data],
+    [positions, quotesQ.data],
   );
 
   const gainers = rows.filter((r) => r.unrealized >= 0);

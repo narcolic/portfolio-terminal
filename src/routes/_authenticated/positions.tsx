@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   listPositions, createPosition, updatePosition, deletePosition,
-  bulkImportPositions, type PositionInputType,
+  bulkImportPositions, type TransactionInputType,
 } from "@/lib/positions.functions";
 import {
   listPortfolios, createPortfolio, deletePortfolio, type PortfolioInputType,
@@ -13,20 +13,23 @@ import {
 import { parseCSV, mapCsvRows } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/positions")({
-  component: PositionsPage,
+  component: TransactionsPage,
 });
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
 const MARKETS = ["NASDAQ", "NYSE", "LSE", "EPA", "ETR", "TSX", "ASX", "HKEX", "TSE", "CRYPTO", "OTHER"];
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
 
-const empty: PositionInputType = {
-  ticker: "", name: "", asset_type: "stock",
-  market: "NASDAQ", currency: "USD", shares: 0, avg_cost: 0, notes: "",
-  portfolio_id: null,
-};
+const today = () => new Date().toISOString().slice(0, 10);
 
-function PositionsPage() {
+const empty = (): TransactionInputType => ({
+  ticker: "", name: "", asset_type: "stock",
+  market: "NASDAQ", currency: "USD",
+  shares: 0, price: 0, transaction_date: today(),
+  notes: "", portfolio_id: null,
+});
+
+function TransactionsPage() {
   const qc = useQueryClient();
   const list = useServerFn(listPositions);
   const create = useServerFn(createPosition);
@@ -40,7 +43,7 @@ function PositionsPage() {
   const { data = [], isLoading } = useQuery({ queryKey: ["positions"], queryFn: () => list() });
   const { data: portfolios = [] } = useQuery({ queryKey: ["portfolios"], queryFn: () => listP() });
 
-  const [editing, setEditing] = useState<(PositionInputType & { id?: string }) | null>(null);
+  const [editing, setEditing] = useState<(TransactionInputType & { id?: string }) | null>(null);
   const [showPortfolios, setShowPortfolios] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,12 +58,12 @@ function PositionsPage() {
   };
 
   const createM = useMutation({
-    mutationFn: (v: PositionInputType) => create({ data: v }),
-    onSuccess: () => { invalidate(); setEditing(null); toast.success("Position added"); },
+    mutationFn: (v: TransactionInputType) => create({ data: v }),
+    onSuccess: () => { invalidate(); setEditing(null); toast.success("Transaction added"); },
     onError: (e: Error) => toast.error(e.message),
   });
   const updateM = useMutation({
-    mutationFn: (v: PositionInputType & { id: string }) => update({ data: v }),
+    mutationFn: (v: TransactionInputType & { id: string }) => update({ data: v }),
     onSuccess: () => { invalidate(); setEditing(null); toast.success("Updated"); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -78,7 +81,6 @@ function PositionsPage() {
       if (errors.length) errors.slice(0, 3).forEach((e) => toast.error(e));
       if (!rows.length) throw new Error("No valid rows to import");
 
-      // Auto-create portfolios referenced by name
       const nameToId = new Map(portfolios.map((p) => [p.name.toLowerCase(), p.id]));
       const newNames = Array.from(new Set(
         rows.map((r) => r.portfolio?.trim()).filter((n): n is string => !!n && !nameToId.has(n.toLowerCase()))
@@ -88,23 +90,24 @@ function PositionsPage() {
         nameToId.set(n.toLowerCase(), p.id);
       }
 
-      const payload = rows.map((r) => ({
+      const payload: TransactionInputType[] = rows.map((r) => ({
         ticker: r.ticker,
         name: r.name ?? null,
         asset_type: (ASSET_TYPES as readonly string[]).includes(r.asset_type ?? "")
-          ? (r.asset_type as PositionInputType["asset_type"])
+          ? (r.asset_type as TransactionInputType["asset_type"])
           : "stock",
         market: r.market ?? null,
         currency: r.currency ?? "USD",
         shares: r.shares,
-        avg_cost: r.avg_cost,
+        price: r.price,
+        transaction_date: r.transaction_date,
         notes: r.notes ?? null,
         portfolio_id: r.portfolio ? nameToId.get(r.portfolio.toLowerCase()) ?? null : null,
-      })) as PositionInputType[];
+      }));
 
       return bulk({ data: { rows: payload } });
     },
-    onSuccess: (r) => { invalidate(); toast.success(`Imported ${r.inserted} positions`); },
+    onSuccess: (r) => { invalidate(); toast.success(`Imported ${r.inserted} transactions`); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -112,9 +115,9 @@ function PositionsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl uppercase tracking-[0.2em]">&gt; POSITIONS</h1>
+          <h1 className="text-xl uppercase tracking-[0.2em]">&gt; TRANSACTIONS</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Use Yahoo Finance tickers (e.g. AAPL, MSFT, BTC-USD, AIR.PA, VOD.L)
+            Each row is a single buy. Average cost per holding is computed automatically.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -144,19 +147,21 @@ function PositionsPage() {
           </button>
           <a
             href={`data:text/csv;charset=utf-8,${encodeURIComponent(
-              `ticker,name,asset_type,market,currency,shares,avg_cost,portfolio,notes\n` +
-              `AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR,\n` +
-              `AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro,\n` +
-              `VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR,\n` +
-              `BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase,long term\n`
+              `transaction_date,ticker,name,asset_type,market,currency,shares,price,portfolio,notes\n` +
+              `2024-01-15,AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR,initial buy\n` +
+              `2024-06-03,AAPL,Apple Inc.,stock,NASDAQ,USD,5,185.40,IBKR,add\n` +
+              `2024-03-10,AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro,\n` +
+              `2024-02-20,VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR,\n` +
+              `2023-11-01,BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,35000,Coinbase,long term\n` +
+              `2024-08-12,BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.25,58000,Coinbase,DCA\n`
             )}`}
-            download="positions-template.csv"
+            download="transactions-template.csv"
             className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
           >
             ↓ Template
           </a>
           <button
-            onClick={() => setEditing({ ...empty })}
+            onClick={() => setEditing(empty())}
             className="bg-primary text-primary-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
           >
             + NEW
@@ -169,16 +174,16 @@ function PositionsPage() {
           CSV format help
         </summary>
         <div className="px-3 pb-3 text-muted-foreground space-y-1">
-          <p><strong className="text-foreground">Required columns:</strong> <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
-          <p><strong className="text-foreground">Optional columns:</strong> <code>name</code>, <code>asset_type</code> (stock/etf/crypto/bond/fund/other), <code>market</code> (NASDAQ, NYSE, LSE, EPA, …), <code>currency</code> (USD, EUR, GBP, …), <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Required columns:</strong> <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>, <code className="text-primary">price</code>.</p>
+          <p><strong className="text-foreground">Optional:</strong> <code>transaction_date</code> (YYYY-MM-DD, defaults to today), <code>name</code>, <code>asset_type</code> (stock/etf/crypto/bond/fund/other), <code>market</code>, <code>currency</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p><strong className="text-foreground">Multiple buys?</strong> Just add multiple rows for the same ticker — average cost is computed automatically.</p>
           <p><strong className="text-foreground">Tickers:</strong> use Yahoo Finance symbols — <code>AAPL</code>, <code>AIR.PA</code>, <code>VOD.L</code>, <code>BTC-USD</code>.</p>
-          <p><strong className="text-foreground">Portfolios:</strong> the <code>portfolio</code> column auto-creates portfolios by name. Each row's <code>currency</code> is independent, so one portfolio can hold positions in multiple currencies.</p>
-          <p>Aliases accepted: symbol→ticker, qty/quantity→shares, cost/price→avg_cost, broker/account/platform→portfolio.</p>
-          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,name,asset_type,market,currency,shares,avg_cost,portfolio
-AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR
-AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro
-VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR
-BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
+          <p>Aliases: symbol→ticker, qty/quantity→shares, cost/avg_cost/buy price→price, date/trade date→transaction_date, broker/account/platform→portfolio.</p>
+          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`transaction_date,ticker,asset_type,currency,shares,price,portfolio
+2024-01-15,AAPL,stock,USD,10,150.20,IBKR
+2024-06-03,AAPL,stock,USD,5,185.40,IBKR
+2024-03-10,AIR.PA,stock,EUR,5,128.40,Degiro
+2023-11-01,BTC-USD,crypto,USD,0.5,35000,Coinbase`}</pre>
         </div>
       </details>
 
@@ -186,13 +191,13 @@ BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
         <table className="w-full text-[12px]">
           <thead className="text-[10px] uppercase tracking-widest text-muted-foreground bg-secondary/40">
             <tr>
+              <th className="text-left px-3 py-2">Date</th>
               <th className="text-left px-3 py-2">Ticker</th>
-              <th className="text-left px-3 py-2">Name</th>
               <th className="text-left px-3 py-2">Portfolio</th>
               <th className="text-left px-3 py-2">Type</th>
               <th className="text-left px-3 py-2">Market</th>
               <th className="text-right px-3 py-2">Shares</th>
-              <th className="text-right px-3 py-2">Avg Cost</th>
+              <th className="text-right px-3 py-2">Price</th>
               <th className="text-right px-3 py-2">Ccy</th>
               <th className="px-3 py-2"></th>
             </tr>
@@ -202,32 +207,33 @@ BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
               <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!isLoading && data.length === 0 && (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No positions yet</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No transactions yet</td></tr>
             )}
             {data.map((p) => (
               <tr key={p.id} className="border-t border-border/60 hover:bg-secondary/30">
+                <td className="px-3 py-2 text-[11px] tabular-nums">{p.transaction_date}</td>
                 <td className="px-3 py-2 font-bold text-primary">{p.ticker}</td>
-                <td className="px-3 py-2 text-muted-foreground truncate max-w-[180px]">{p.name || "—"}</td>
                 <td className="px-3 py-2 text-[11px]">{portfolioName(p.portfolio_id)}</td>
                 <td className="px-3 py-2 uppercase text-[11px]">{p.asset_type}</td>
                 <td className="px-3 py-2 text-[11px]">{p.market || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{Number(p.shares)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{Number(p.avg_cost).toFixed(2)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{Number(p.price).toFixed(2)}</td>
                 <td className="px-3 py-2 text-[11px]">{p.currency}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button
                     onClick={() => setEditing({
                       id: p.id, ticker: p.ticker, name: p.name ?? "",
-                      asset_type: p.asset_type as PositionInputType["asset_type"],
+                      asset_type: p.asset_type as TransactionInputType["asset_type"],
                       market: p.market ?? "", currency: p.currency,
-                      shares: Number(p.shares), avg_cost: Number(p.avg_cost),
+                      shares: Number(p.shares), price: Number(p.price),
+                      transaction_date: p.transaction_date,
                       notes: p.notes ?? "",
                       portfolio_id: p.portfolio_id ?? null,
                     })}
                     className="text-primary text-[11px] uppercase mr-3 hover:underline"
                   >edit</button>
                   <button
-                    onClick={() => { if (confirm(`Delete ${p.ticker}?`)) deleteM.mutate(p.id); }}
+                    onClick={() => { if (confirm(`Delete transaction for ${p.ticker} on ${p.transaction_date}?`)) deleteM.mutate(p.id); }}
                     className="text-bear text-[11px] uppercase hover:underline"
                   >del</button>
                 </td>
@@ -278,27 +284,34 @@ BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,45000,Coinbase`}</pre>
 function EditModal({
   value, portfolios, onSave, onClose, busy,
 }: {
-  value: PositionInputType & { id?: string };
+  value: TransactionInputType & { id?: string };
   portfolios: { id: string; name: string }[];
-  onSave: (v: PositionInputType) => void;
+  onSave: (v: TransactionInputType) => void;
   onClose: () => void;
   busy: boolean;
 }) {
   const [v, setV] = useState(value);
-  const set = <K extends keyof PositionInputType>(k: K, val: PositionInputType[K]) =>
+  const set = <K extends keyof TransactionInputType>(k: K, val: TransactionInputType[K]) =>
     setV((s) => ({ ...s, [k]: val }));
 
   return (
     <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur flex items-start md:items-center justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-lg border border-border bg-card">
         <div className="border-b border-border bg-secondary/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-primary flex justify-between">
-          <span>&gt; {value.id ? "EDIT" : "NEW"} POSITION</span>
+          <span>&gt; {value.id ? "EDIT" : "NEW"} TRANSACTION</span>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
         </div>
         <form
           onSubmit={(e) => { e.preventDefault(); onSave(v); }}
           className="p-4 grid grid-cols-2 gap-3"
         >
+          <Field label="Date">
+            <input
+              type="date" required value={v.transaction_date}
+              onChange={(e) => set("transaction_date", e.target.value)}
+              className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+            />
+          </Field>
           <Field label="Ticker">
             <input
               required value={v.ticker}
@@ -308,9 +321,15 @@ function EditModal({
             />
           </Field>
           <Field label="Type">
-            <select value={v.asset_type} onChange={(e) => set("asset_type", e.target.value as PositionInputType["asset_type"])}
+            <select value={v.asset_type} onChange={(e) => set("asset_type", e.target.value as TransactionInputType["asset_type"])}
               className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary">
               {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
+          <Field label="Currency">
+            <select value={v.currency} onChange={(e) => set("currency", e.target.value)}
+              className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary">
+              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
             </select>
           </Field>
           <Field label="Name" colSpan={2}>
@@ -336,12 +355,6 @@ function EditModal({
               {MARKETS.map((m) => <option key={m}>{m}</option>)}
             </select>
           </Field>
-          <Field label="Currency">
-            <select value={v.currency} onChange={(e) => set("currency", e.target.value)}
-              className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary">
-              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </Field>
           <Field label="Shares">
             <input
               type="number" step="any" min="0" required value={v.shares}
@@ -349,10 +362,10 @@ function EditModal({
               className="w-full bg-input border border-border px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:border-primary"
             />
           </Field>
-          <Field label="Avg Cost / Share">
+          <Field label="Price / Share">
             <input
-              type="number" step="any" min="0" required value={v.avg_cost}
-              onChange={(e) => set("avg_cost", Number(e.target.value))}
+              type="number" step="any" min="0" required value={v.price}
+              onChange={(e) => set("price", Number(e.target.value))}
               className="w-full bg-input border border-border px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:border-primary"
             />
           </Field>
@@ -399,7 +412,7 @@ function PortfoliosModal({
         </div>
         <div className="p-4 space-y-4">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Portfolios are multi-currency. Currency is set per position.
+            Portfolios are multi-currency. Currency is set per transaction.
           </p>
           <form
             onSubmit={async (e) => {
@@ -441,7 +454,7 @@ function PortfoliosModal({
                   </div>
                 </div>
                 <button
-                  onClick={() => { if (confirm(`Delete portfolio "${p.name}"? Positions will become unassigned.`)) onDelete(p.id); }}
+                  onClick={() => { if (confirm(`Delete portfolio "${p.name}"? Transactions will become unassigned.`)) onDelete(p.id); }}
                   className="text-bear text-[10px] uppercase hover:underline"
                 >del</button>
               </div>
