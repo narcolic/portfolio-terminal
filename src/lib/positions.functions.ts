@@ -11,6 +11,7 @@ const PositionInput = z.object({
   shares: z.number().nonnegative().max(1e9),
   avg_cost: z.number().nonnegative().max(1e9),
   notes: z.string().trim().max(500).optional().nullable(),
+  portfolio_id: z.string().uuid().optional().nullable(),
 });
 
 export type PositionInputType = z.infer<typeof PositionInput>;
@@ -63,4 +64,25 @@ export const deletePosition = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("positions").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const bulkImportPositions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      rows: z.array(PositionInput).min(1).max(500),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const payload = data.rows.map((r) => ({
+      ...r,
+      ticker: r.ticker.toUpperCase(),
+      user_id: context.userId,
+    }));
+    const { error, data: rows } = await context.supabase
+      .from("positions")
+      .insert(payload)
+      .select();
+    if (error) throw new Error(error.message);
+    return { inserted: rows?.length ?? 0 };
   });
