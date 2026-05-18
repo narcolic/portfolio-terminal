@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  listPositions, createPosition, updatePosition, deletePosition,
+  listPositions, createPosition, updatePosition, deletePosition, bulkDeletePositions,
   bulkImportPositions, type TransactionInputType,
 } from "@/lib/positions.functions";
 import {
