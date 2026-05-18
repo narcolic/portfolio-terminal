@@ -100,7 +100,10 @@ async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSym
     const rawPrice = Number(m.regularMarketPrice ?? closes.at(-1));
     const rawPrev = Number(m.chartPreviousClose ?? m.previousClose ?? closes.at(-2) ?? rawPrice);
     const yahooCurrency = String(m.currency ?? "USD");
-    const isPence = yahooCurrency.toUpperCase() === "GBP" && rawPrice > 1000 || yahooCurrency.toUpperCase() === "GBX" || yahooCurrency === "GBp";
+    const isPence =
+      (yahooCurrency.toUpperCase() === "GBP" && rawPrice > 1000) ||
+      yahooCurrency.toUpperCase() === "GBX" ||
+      yahooCurrency === "GBp";
     const price = isPence ? rawPrice / 100 : rawPrice;
     const prev = isPence ? rawPrev / 100 : rawPrev;
     if (!Number.isFinite(price)) return null;
