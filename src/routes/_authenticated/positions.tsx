@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   listPositions, createPosition, updatePosition, deletePosition,
-  type PositionInputType,
+  bulkImportPositions, type PositionInputType,
 } from "@/lib/positions.functions";
+import {
+  listPortfolios, createPortfolio, deletePortfolio, type PortfolioInputType,
+} from "@/lib/portfolios.functions";
+import { parseCSV, mapCsvRows } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/positions")({
   component: PositionsPage,
@@ -19,6 +23,7 @@ const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
 const empty: PositionInputType = {
   ticker: "", name: "", asset_type: "stock",
   market: "NASDAQ", currency: "USD", shares: 0, avg_cost: 0, notes: "",
+  portfolio_id: null,
 };
 
 function PositionsPage() {
@@ -27,12 +32,27 @@ function PositionsPage() {
   const create = useServerFn(createPosition);
   const update = useServerFn(updatePosition);
   const del = useServerFn(deletePosition);
+  const bulk = useServerFn(bulkImportPositions);
+  const listP = useServerFn(listPortfolios);
+  const createP = useServerFn(createPortfolio);
+  const delP = useServerFn(deletePortfolio);
 
   const { data = [], isLoading } = useQuery({ queryKey: ["positions"], queryFn: () => list() });
+  const { data: portfolios = [] } = useQuery({ queryKey: ["portfolios"], queryFn: () => listP() });
 
   const [editing, setEditing] = useState<(PositionInputType & { id?: string }) | null>(null);
+  const [showPortfolios, setShowPortfolios] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["positions"] });
+  const portfolioName = useMemo(() => {
+    const m = new Map(portfolios.map((p) => [p.id, p.name]));
+    return (id: string | null) => (id ? m.get(id) ?? "—" : "Unassigned");
+  }, [portfolios]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["positions"] });
+    qc.invalidateQueries({ queryKey: ["portfolios"] });
+  };
 
   const createM = useMutation({
     mutationFn: (v: PositionInputType) => create({ data: v }),
@@ -50,22 +70,101 @@ function PositionsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const importM = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      const parsed = parseCSV(text);
+      const { rows, errors } = mapCsvRows(parsed);
+      if (errors.length) errors.slice(0, 3).forEach((e) => toast.error(e));
+      if (!rows.length) throw new Error("No valid rows to import");
+
+      // Auto-create portfolios referenced by name
+      const nameToId = new Map(portfolios.map((p) => [p.name.toLowerCase(), p.id]));
+      const newNames = Array.from(new Set(
+        rows.map((r) => r.portfolio?.trim()).filter((n): n is string => !!n && !nameToId.has(n.toLowerCase()))
+      ));
+      for (const n of newNames) {
+        const p = await createP({ data: { name: n, currency: "USD" } });
+        nameToId.set(n.toLowerCase(), p.id);
+      }
+
+      const payload = rows.map((r) => ({
+        ticker: r.ticker,
+        name: r.name ?? null,
+        asset_type: (ASSET_TYPES as readonly string[]).includes(r.asset_type ?? "")
+          ? (r.asset_type as PositionInputType["asset_type"])
+          : "stock",
+        market: r.market ?? null,
+        currency: r.currency ?? "USD",
+        shares: r.shares,
+        avg_cost: r.avg_cost,
+        notes: r.notes ?? null,
+        portfolio_id: r.portfolio ? nameToId.get(r.portfolio.toLowerCase()) ?? null : null,
+      })) as PositionInputType[];
+
+      return bulk({ data: { rows: payload } });
+    },
+    onSuccess: (r) => { invalidate(); toast.success(`Imported ${r.inserted} positions`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl uppercase tracking-[0.2em]">&gt; POSITIONS</h1>
           <p className="text-xs text-muted-foreground mt-1">
             Use Yahoo Finance tickers (e.g. AAPL, MSFT, BTC-USD, AIR.PA, VOD.L)
           </p>
         </div>
-        <button
-          onClick={() => setEditing({ ...empty })}
-          className="bg-primary text-primary-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
-        >
-          + NEW
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowPortfolios(true)}
+            className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
+          >
+            ▣ Portfolios ({portfolios.length})
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importM.mutate(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importM.isPending}
+            className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary disabled:opacity-50"
+          >
+            {importM.isPending ? "Importing…" : "↑ Upload CSV"}
+          </button>
+          <button
+            onClick={() => setEditing({ ...empty })}
+            className="bg-primary text-primary-foreground px-4 py-2 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
+          >
+            + NEW
+          </button>
+        </div>
       </div>
+
+      <details className="border border-border bg-card/50 text-[11px]">
+        <summary className="cursor-pointer px-3 py-2 uppercase tracking-[0.2em] text-muted-foreground hover:text-primary">
+          CSV format help
+        </summary>
+        <div className="px-3 pb-3 text-muted-foreground space-y-1">
+          <p>Required columns: <code className="text-primary">ticker</code>, <code className="text-primary">shares</code>.</p>
+          <p>Optional: <code>name</code>, <code>asset_type</code>, <code>market</code>, <code>currency</code>, <code>avg_cost</code>, <code>portfolio</code>, <code>notes</code>.</p>
+          <p>Aliases accepted: symbol→ticker, qty/quantity→shares, cost/price→avg_cost, broker/account/platform→portfolio.</p>
+          <pre className="mt-2 bg-background border border-border p-2 overflow-x-auto">{`ticker,shares,avg_cost,currency,portfolio
+AAPL,10,150.20,USD,IBKR
+MSFT,5,310.00,USD,IBKR
+BTC-USD,0.5,45000,USD,Coinbase`}</pre>
+        </div>
+      </details>
 
       <div className="border border-border bg-card overflow-x-auto">
         <table className="w-full text-[12px]">
@@ -73,6 +172,7 @@ function PositionsPage() {
             <tr>
               <th className="text-left px-3 py-2">Ticker</th>
               <th className="text-left px-3 py-2">Name</th>
+              <th className="text-left px-3 py-2">Portfolio</th>
               <th className="text-left px-3 py-2">Type</th>
               <th className="text-left px-3 py-2">Market</th>
               <th className="text-right px-3 py-2">Shares</th>
@@ -83,15 +183,16 @@ function PositionsPage() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!isLoading && data.length === 0 && (
-              <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No positions yet</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No positions yet</td></tr>
             )}
             {data.map((p) => (
               <tr key={p.id} className="border-t border-border/60 hover:bg-secondary/30">
                 <td className="px-3 py-2 font-bold text-primary">{p.ticker}</td>
-                <td className="px-3 py-2 text-muted-foreground truncate max-w-[200px]">{p.name || "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground truncate max-w-[180px]">{p.name || "—"}</td>
+                <td className="px-3 py-2 text-[11px]">{portfolioName(p.portfolio_id)}</td>
                 <td className="px-3 py-2 uppercase text-[11px]">{p.asset_type}</td>
                 <td className="px-3 py-2 text-[11px]">{p.market || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{Number(p.shares)}</td>
@@ -105,6 +206,7 @@ function PositionsPage() {
                       market: p.market ?? "", currency: p.currency,
                       shares: Number(p.shares), avg_cost: Number(p.avg_cost),
                       notes: p.notes ?? "",
+                      portfolio_id: p.portfolio_id ?? null,
                     })}
                     className="text-primary text-[11px] uppercase mr-3 hover:underline"
                   >edit</button>
@@ -122,6 +224,7 @@ function PositionsPage() {
       {editing && (
         <EditModal
           value={editing}
+          portfolios={portfolios}
           onClose={() => setEditing(null)}
           busy={createM.isPending || updateM.isPending}
           onSave={(v) => {
@@ -130,14 +233,37 @@ function PositionsPage() {
           }}
         />
       )}
+
+      {showPortfolios && (
+        <PortfoliosModal
+          portfolios={portfolios}
+          onClose={() => setShowPortfolios(false)}
+          onCreate={async (v) => {
+            try {
+              await createP({ data: v });
+              qc.invalidateQueries({ queryKey: ["portfolios"] });
+              toast.success("Portfolio added");
+            } catch (e) { toast.error((e as Error).message); }
+          }}
+          onDelete={async (id) => {
+            try {
+              await delP({ data: { id } });
+              qc.invalidateQueries({ queryKey: ["portfolios"] });
+              qc.invalidateQueries({ queryKey: ["positions"] });
+              toast.success("Portfolio removed");
+            } catch (e) { toast.error((e as Error).message); }
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function EditModal({
-  value, onSave, onClose, busy,
+  value, portfolios, onSave, onClose, busy,
 }: {
   value: PositionInputType & { id?: string };
+  portfolios: { id: string; name: string }[];
   onSave: (v: PositionInputType) => void;
   onClose: () => void;
   busy: boolean;
@@ -177,6 +303,16 @@ function EditModal({
               placeholder="Apple Inc. (optional, fallback to Yahoo)"
               className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
             />
+          </Field>
+          <Field label="Portfolio" colSpan={2}>
+            <select
+              value={v.portfolio_id ?? ""}
+              onChange={(e) => set("portfolio_id", e.target.value || null)}
+              className="w-full bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+            >
+              <option value="">— Unassigned —</option>
+              {portfolios.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </Field>
           <Field label="Market">
             <select value={v.market ?? ""} onChange={(e) => set("market", e.target.value)}
@@ -222,6 +358,84 @@ function EditModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function PortfoliosModal({
+  portfolios, onClose, onCreate, onDelete,
+}: {
+  portfolios: { id: string; name: string; broker: string | null; currency: string }[];
+  onClose: () => void;
+  onCreate: (v: PortfolioInputType) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [broker, setBroker] = useState("");
+  const [currency, setCurrency] = useState("USD");
+
+  return (
+    <div className="fixed inset-0 z-20 bg-background/80 backdrop-blur flex items-start md:items-center justify-center p-4 overflow-y-auto">
+      <div className="w-full max-w-md border border-border bg-card">
+        <div className="border-b border-border bg-secondary/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-primary flex justify-between">
+          <span>&gt; PORTFOLIOS</span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <div className="p-4 space-y-4">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!name.trim()) return;
+              await onCreate({ name: name.trim(), broker: broker.trim() || null, currency });
+              setName(""); setBroker("");
+            }}
+            className="grid grid-cols-2 gap-2"
+          >
+            <input
+              value={name} onChange={(e) => setName(e.target.value)} required
+              placeholder="Name (e.g. IBKR)"
+              className="col-span-2 bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+            />
+            <input
+              value={broker} onChange={(e) => setBroker(e.target.value)}
+              placeholder="Broker (optional)"
+              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+            />
+            <select
+              value={currency} onChange={(e) => setCurrency(e.target.value)}
+              className="bg-input border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"
+            >
+              {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+            <button
+              type="submit"
+              className="col-span-2 bg-primary text-primary-foreground px-3 py-1.5 text-xs uppercase tracking-[0.2em] font-bold hover:opacity-90"
+            >
+              + Add Portfolio
+            </button>
+          </form>
+
+          <div className="border border-border">
+            {portfolios.length === 0 && (
+              <div className="p-3 text-center text-[11px] text-muted-foreground">No portfolios yet</div>
+            )}
+            {portfolios.map((p) => (
+              <div key={p.id} className="flex items-center justify-between border-t first:border-t-0 border-border/60 px-3 py-2 text-[12px]">
+                <div>
+                  <div className="font-bold">{p.name}</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                    {p.broker || "—"} · {p.currency}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { if (confirm(`Delete portfolio "${p.name}"? Positions will become unassigned.`)) onDelete(p.id); }}
+                  className="text-bear text-[10px] uppercase hover:underline"
+                >del</button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
