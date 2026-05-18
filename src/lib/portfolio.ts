@@ -81,7 +81,11 @@ export function aggregateTransactions(txs: TransactionRow[]): PositionRow[] {
 }
 
 export function enrich(positions: PositionRow[], quotes: Quote[]): Enriched[] {
-  const map = new Map(quotes.map((q) => [q.symbol.toUpperCase(), q]));
+  const map = new Map<string, Quote>();
+  for (const q of quotes) {
+    map.set(q.symbol.toUpperCase(), q);
+    if (q.inputSymbol) map.set(q.inputSymbol.toUpperCase(), q);
+  }
   return positions.map((p) => {
     const q = map.get(p.ticker.toUpperCase());
     const price = q?.regularMarketPrice ?? Number(p.avg_cost);
