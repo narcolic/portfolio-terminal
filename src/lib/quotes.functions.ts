@@ -6,8 +6,8 @@ const QuoteInput = z.object({
 });
 
 export interface Quote {
-  symbol: string;            // resolved symbol used to fetch (e.g. VUAA.L)
-  inputSymbol: string;       // original user input (e.g. IE00BFMXXD54)
+  symbol: string;
+  inputSymbol: string;
   shortName?: string;
   regularMarketPrice: number;
   regularMarketChange: number;
@@ -18,145 +18,108 @@ export interface Quote {
   marketState?: string;
 }
 
-// ===== Caches =====
 type CachedQ = { quote: Quote; ts: number };
 const QUOTE_CACHE = new Map<string, CachedQ>();
-const RESOLVE_CACHE = new Map<string, string>();
 const TTL_MS = 60_000;
 const STALE_MS = 30 * 60_000;
 
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
-
-const isIsin = (s: string) => /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s.toUpperCase());
-
-async function yahooFetch(url: string, attempts = 3): Promise<Response | null> {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
-      if (res.status === 429 || res.status >= 500) {
-        await new Promise((r) => setTimeout(r, 250 * (i + 1) ** 2));
-        continue;
-      }
-      return res;
-    } catch {
-      await new Promise((r) => setTimeout(r, 200 * (i + 1)));
-    }
-  }
-  return null;
+function parseTd(symbol: string, input: string, raw: any): Quote | null {
+  if (!raw || raw.status === "error") return null;
+  const price = Number(raw.close ?? raw.price);
+  const prev = Number(raw.previous_close ?? price);
+  if (!Number.isFinite(price)) return null;
+  const rawCur = String(raw.currency ?? "USD").toUpperCase();
+  const isPence = rawCur === "GBP" && price > 1000;
+  const p = isPence ? price / 100 : price;
+  const pp = isPence ? prev / 100 : prev;
+  const change = p - pp;
+  return {
+    symbol: String(raw.symbol ?? symbol).toUpperCase(),
+    inputSymbol: input.toUpperCase(),
+    shortName: raw.name,
+    regularMarketPrice: p,
+    regularMarketPreviousClose: pp,
+    regularMarketChange: change,
+    regularMarketChangePercent: pp ? (change / pp) * 100 : 0,
+    currency: isPence ? "GBP" : rawCur,
+    exchange: raw.exchange,
+    marketState: raw.is_market_open === false ? "CLOSED" : "REGULAR",
+  };
 }
 
-async function resolveSymbol(input: string): Promise<string> {
-  const up = input.toUpperCase();
-  if (!isIsin(up)) return up;
-  if (RESOLVE_CACHE.has(up)) return RESOLVE_CACHE.get(up)!;
-  const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(up)}&quotesCount=8&newsCount=0`;
-  const res = await yahooFetch(url);
-  if (!res || !res.ok) return up;
-  try {
-    const json: any = await res.json();
-    const quotes: any[] = json?.quotes ?? [];
-    const exchPref = ["LSE", "AMS", "GER", "STU", "EBS", "MIL", "NMS", "NYQ", "PAR"];
-    const scored = quotes
-      .filter((q) => q.symbol && q.quoteType !== "MUTUALFUND")
-      .sort((a, b) => {
-        const ai = exchPref.indexOf(a.exchange);
-        const bi = exchPref.indexOf(b.exchange);
-        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-      });
-    const pick = scored[0]?.symbol ?? quotes[0]?.symbol ?? up;
-    RESOLVE_CACHE.set(up, pick);
-    return pick;
-  } catch {
-    return up;
+async function fetchBatch(symbols: string[], apiKey: string): Promise<Map<string, any>> {
+  const out = new Map<string, any>();
+  if (symbols.length === 0) return out;
+  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(
+    symbols.join(","),
+  )}&apikey=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) return out;
+  const json: any = await res.json().catch(() => null);
+  if (!json) return out;
+  // Single-symbol responses are flat; multi-symbol are keyed by symbol.
+  if (symbols.length === 1) {
+    out.set(symbols[0].toUpperCase(), json);
+  } else {
+    for (const [k, v] of Object.entries(json)) out.set(k.toUpperCase(), v);
   }
-}
-
-async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSymbol"> | null> {
-  const encoded = encodeURIComponent(symbol);
-  const urls = [
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1m`,
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=1d&interval=1m`,
-  ];
-  let res: Response | null = null;
-  for (const url of urls) {
-    res = await yahooFetch(url, 2);
-    if (res?.ok) break;
-  }
-  if (!res || !res.ok) return null;
-  try {
-    const json: any = await res.json();
-    const r = json?.chart?.result?.[0];
-    if (!r) return null;
-    const m = r.meta ?? {};
-    const closes = (r.indicators?.quote?.[0]?.close ?? []).filter((v: unknown) => Number.isFinite(Number(v)));
-    const rawPrice = Number(m.regularMarketPrice ?? closes.at(-1));
-    const rawPrev = Number(m.chartPreviousClose ?? m.previousClose ?? closes.at(0) ?? rawPrice);
-    const yahooCurrency = String(m.currency ?? "USD");
-    const isPence =
-      (yahooCurrency.toUpperCase() === "GBP" && rawPrice > 1000) ||
-      yahooCurrency.toUpperCase() === "GBX" ||
-      yahooCurrency === "GBp";
-    const price = isPence ? rawPrice / 100 : rawPrice;
-    const prev = isPence ? rawPrev / 100 : rawPrev;
-    if (!Number.isFinite(price)) return null;
-    const change = price - prev;
-    return {
-      symbol: (m.symbol ?? symbol).toUpperCase(),
-      shortName: m.shortName ?? m.longName ?? m.symbol,
-      regularMarketPrice: price,
-      regularMarketPreviousClose: prev,
-      regularMarketChange: change,
-      regularMarketChangePercent: prev ? (change / prev) * 100 : 0,
-      currency: isPence ? "GBP" : yahooCurrency,
-      exchange: m.exchangeName ?? m.fullExchangeName,
-      marketState: m.marketState,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function getQuoteFor(input: string): Promise<{ q: Quote | null; stale: boolean; err: boolean }> {
-  const up = input.toUpperCase();
-  const resolved = await resolveSymbol(up);
-  const hit = QUOTE_CACHE.get(resolved);
-  const now = Date.now();
-  if (hit && now - hit.ts < TTL_MS) return { q: hit.quote, stale: false, err: false };
-  const fresh = await fetchQuoteBySymbol(resolved);
-  if (fresh) {
-    const q: Quote = { ...fresh, inputSymbol: up };
-    QUOTE_CACHE.set(resolved, { quote: q, ts: now });
-    return { q, stale: false, err: false };
-  }
-  if (hit && now - hit.ts < STALE_MS) return { q: hit.quote, stale: true, err: true };
-  return { q: null, stale: false, err: true };
-}
-
-async function mapLimit<T, R>(arr: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(arr.length);
-  let i = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, arr.length) }, async () => {
-      while (i < arr.length) {
-        const idx = i++;
-        out[idx] = await fn(arr[idx]);
-      }
-    }),
-  );
   return out;
 }
 
 export const getQuotes = createServerFn({ method: "POST" })
   .inputValidator((input) => QuoteInput.parse(input))
   .handler(async ({ data }): Promise<{ quotes: Quote[]; error: string | null }> => {
-    const results = await mapLimit(data.symbols, 2, (s) => getQuoteFor(s));
-    const quotes = results.map((r) => r.q).filter((q): q is Quote => !!q);
-    const anyErr = results.some((r) => r.err);
-    const anyStale = results.some((r) => r.stale);
+    const apiKey = process.env.TWELVEDATA_API_KEY;
+    if (!apiKey) return { quotes: [], error: "TWELVEDATA_API_KEY not configured" };
+
+    const now = Date.now();
+    const need: string[] = [];
+    const cached = new Map<string, Quote>();
+    for (const s of data.symbols) {
+      const up = s.toUpperCase();
+      const hit = QUOTE_CACHE.get(up);
+      if (hit && now - hit.ts < TTL_MS) cached.set(up, hit.quote);
+      else need.push(up);
+    }
+
+    let raw = new Map<string, any>();
+    let fetchErr = false;
+    try {
+      // Twelve Data free tier: 8 req/min — batch in chunks of ~30 symbols
+      const chunks: string[][] = [];
+      for (let i = 0; i < need.length; i += 30) chunks.push(need.slice(i, i + 30));
+      for (const c of chunks) {
+        const m = await fetchBatch(c, apiKey);
+        for (const [k, v] of m) raw.set(k, v);
+      }
+    } catch {
+      fetchErr = true;
+    }
+
+    const quotes: Quote[] = [];
+    let anyStale = false;
+    for (const s of data.symbols) {
+      const up = s.toUpperCase();
+      if (cached.has(up)) {
+        quotes.push(cached.get(up)!);
+        continue;
+      }
+      const q = parseTd(up, up, raw.get(up));
+      if (q) {
+        QUOTE_CACHE.set(up, { quote: q, ts: now });
+        quotes.push(q);
+      } else {
+        const hit = QUOTE_CACHE.get(up);
+        if (hit && now - hit.ts < STALE_MS) {
+          quotes.push(hit.quote);
+          anyStale = true;
+        }
+      }
+    }
+
     const missing = data.symbols.length - quotes.length;
     let error: string | null = null;
-    if (quotes.length === 0 && anyErr) error = "Quote service unavailable";
+    if (quotes.length === 0 && (fetchErr || need.length > 0)) error = "Quote service unavailable";
     else if (missing > 0) error = `${missing} symbol(s) could not be priced — check ticker`;
     else if (anyStale) error = "Some quotes are stale";
     return { quotes, error };
