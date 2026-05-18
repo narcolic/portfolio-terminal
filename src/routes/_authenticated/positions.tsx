@@ -74,6 +74,11 @@ function TransactionsPage() {
     onSuccess: () => { invalidate(); toast.success("Removed"); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const bulkDeleteM = useMutation({
+    mutationFn: (ids: string[]) => bulkDel({ data: { ids } }),
+    onSuccess: (r) => { invalidate(); setSelected(new Set()); toast.success(`Deleted ${r.deleted} transactions`); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const importM = useMutation({
     mutationFn: async (file: File) => {
