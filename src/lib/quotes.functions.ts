@@ -80,18 +80,25 @@ async function resolveSymbol(input: string): Promise<string> {
 }
 
 async function fetchQuoteBySymbol(symbol: string): Promise<Omit<Quote, "inputSymbol"> | null> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    symbol,
-  )}?interval=1d&range=5d`;
-  const res = await yahooFetch(url);
+  const encoded = encodeURIComponent(symbol);
+  const urls = [
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`,
+  ];
+  let res: Response | null = null;
+  for (const url of urls) {
+    res = await yahooFetch(url, 2);
+    if (res?.ok) break;
+  }
   if (!res || !res.ok) return null;
   try {
     const json: any = await res.json();
     const r = json?.chart?.result?.[0];
     if (!r) return null;
     const m = r.meta ?? {};
-    const price = Number(m.regularMarketPrice);
-    const prev = Number(m.chartPreviousClose ?? m.previousClose ?? price);
+    const closes = (r.indicators?.quote?.[0]?.close ?? []).filter((v: unknown) => Number.isFinite(Number(v)));
+    const price = Number(m.regularMarketPrice ?? closes.at(-1));
+    const prev = Number(m.chartPreviousClose ?? m.previousClose ?? closes.at(-2) ?? price);
     if (!Number.isFinite(price)) return null;
     const change = price - prev;
     return {
@@ -144,7 +151,7 @@ async function mapLimit<T, R>(arr: T[], limit: number, fn: (t: T) => Promise<R>)
 export const getQuotes = createServerFn({ method: "POST" })
   .inputValidator((input) => QuoteInput.parse(input))
   .handler(async ({ data }): Promise<{ quotes: Quote[]; error: string | null }> => {
-    const results = await mapLimit(data.symbols, 4, (s) => getQuoteFor(s));
+    const results = await mapLimit(data.symbols, 2, (s) => getQuoteFor(s));
     const quotes = results.map((r) => r.q).filter((q): q is Quote => !!q);
     const anyErr = results.some((r) => r.err);
     const anyStale = results.some((r) => r.stale);
