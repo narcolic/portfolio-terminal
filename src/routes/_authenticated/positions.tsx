@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  listPositions, createPosition, updatePosition, deletePosition,
+  listPositions, createPosition, updatePosition, deletePosition, bulkDeletePositions,
   bulkImportPositions, type TransactionInputType,
 } from "@/lib/positions.functions";
 import {
@@ -35,6 +35,7 @@ function TransactionsPage() {
   const create = useServerFn(createPosition);
   const update = useServerFn(updatePosition);
   const del = useServerFn(deletePosition);
+  const bulkDel = useServerFn(bulkDeletePositions);
   const bulk = useServerFn(bulkImportPositions);
   const listP = useServerFn(listPortfolios);
   const createP = useServerFn(createPortfolio);
@@ -45,6 +46,7 @@ function TransactionsPage() {
 
   const [editing, setEditing] = useState<(TransactionInputType & { id?: string }) | null>(null);
   const [showPortfolios, setShowPortfolios] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   const portfolioName = useMemo(() => {
@@ -70,6 +72,11 @@ function TransactionsPage() {
   const deleteM = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => { invalidate(); toast.success("Removed"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const bulkDeleteM = useMutation({
+    mutationFn: (ids: string[]) => bulkDel({ data: { ids } }),
+    onSuccess: (r) => { invalidate(); setSelected(new Set()); toast.success(`Deleted ${r.deleted} transactions`); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -187,10 +194,42 @@ function TransactionsPage() {
         </div>
       </details>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 border border-bear/30 bg-bear/5 px-3 py-2 text-[11px]">
+          <span className="uppercase tracking-widest text-bear font-bold">{selected.size} selected</span>
+          <button
+            onClick={() => {
+              if (confirm(`Delete ${selected.size} transactions?`)) bulkDeleteM.mutate(Array.from(selected));
+            }}
+            disabled={bulkDeleteM.isPending}
+            className="border border-bear px-3 py-1 text-[10px] uppercase tracking-widest text-bear hover:bg-bear hover:text-white disabled:opacity-50"
+          >
+            {bulkDeleteM.isPending ? "Deleting…" : "Delete selected"}
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-muted-foreground hover:text-foreground uppercase tracking-widest text-[10px]"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div className="border border-border bg-card overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead className="text-[10px] uppercase tracking-widest text-muted-foreground bg-secondary/40">
             <tr>
+              <th className="px-2 py-2">
+                <input
+                  type="checkbox"
+                  checked={data.length > 0 && selected.size === data.length}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelected(new Set(data.map((p) => p.id)));
+                    else setSelected(new Set());
+                  }}
+                  className="accent-primary"
+                />
+              </th>
               <th className="text-left px-3 py-2">Date</th>
               <th className="text-left px-3 py-2">Ticker</th>
               <th className="text-left px-3 py-2">Portfolio</th>
@@ -204,13 +243,28 @@ function TransactionsPage() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!isLoading && data.length === 0 && (
-              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No transactions yet</td></tr>
+              <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No transactions yet</td></tr>
             )}
             {data.map((p) => (
               <tr key={p.id} className="border-t border-border/60 hover:bg-secondary/30">
+                <td className="px-2 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={(e) => {
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(p.id);
+                        else next.delete(p.id);
+                        return next;
+                      });
+                    }}
+                    className="accent-primary"
+                  />
+                </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums">{p.transaction_date}</td>
                 <td className="px-3 py-2 font-bold text-primary">{p.ticker}</td>
                 <td className="px-3 py-2 text-[11px]">{portfolioName(p.portfolio_id)}</td>

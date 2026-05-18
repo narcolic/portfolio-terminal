@@ -89,3 +89,17 @@ export const bulkImportPositions = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { inserted: rows?.length ?? 0 };
   });
+
+export const bulkDeletePositions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("transactions")
+      .delete()
+      .in("id", data.ids);
+    if (error) throw new Error(error.message);
+    return { deleted: data.ids.length };
+  });
