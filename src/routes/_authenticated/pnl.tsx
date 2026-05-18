@@ -43,7 +43,16 @@ function PnL() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl uppercase tracking-[0.2em]">&gt; GAIN / LOSS</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl uppercase tracking-[0.2em]">&gt; GAIN / LOSS</h1>
+        <button
+          onClick={() => quotesQ.refetch()}
+          disabled={quotesQ.isFetching || tickers.length === 0}
+          className="border border-border bg-card px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
+        >
+          {quotesQ.isFetching ? "syncing…" : "↻ sync"}
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Bucket title="GAINERS" tone="bull" total={totalGain} rows={gainers} />
