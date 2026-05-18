@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      positions: {
+        Row: {
+          asset_type: string
+          avg_cost: number
+          created_at: string
+          currency: string
+          id: string
+          market: string | null
+          name: string | null
+          notes: string | null
+          shares: number
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          avg_cost?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          market?: string | null
+          name?: string | null
+          notes?: string | null
+          shares: number
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          avg_cost?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          market?: string | null
+          name?: string | null
+          notes?: string | null
+          shares?: number
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
