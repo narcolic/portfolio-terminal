@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const TransactionInput = z.object({
-  ticker: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9.\-^=]+$/),
+  ticker: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9.\-^=:_]+$/),
   name: z.string().trim().max(120).optional().nullable(),
   asset_type: z.enum(["stock", "etf", "crypto", "bond", "fund", "other"]),
   market: z.string().trim().max(40).optional().nullable(),
