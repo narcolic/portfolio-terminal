@@ -219,7 +219,7 @@ function TransactionsPage() {
         <table className="w-full text-[12px]">
           <thead className="text-[10px] uppercase tracking-widest text-muted-foreground bg-secondary/40">
             <tr>
-              <th className="px-2 py-2">
+              <th className="px-2 py-2 text-center">
                 <input
                   type="checkbox"
                   checked={data.length > 0 && selected.size === data.length}
@@ -250,7 +250,7 @@ function TransactionsPage() {
             )}
             {data.map((p) => (
               <tr key={p.id} className="border-t border-border/60 hover:bg-secondary/30">
-                <td className="px-2 py-2">
+                <td className="px-2 py-2 text-center">
                   <input
                     type="checkbox"
                     checked={selected.has(p.id)}
