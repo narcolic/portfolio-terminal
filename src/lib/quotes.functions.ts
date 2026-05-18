@@ -3,8 +3,8 @@ import { z } from "zod";
 import yahooFinance from "yahoo-finance2";
 
 // Suppress survey notice + schema validation warnings (Yahoo occasionally adds fields)
-yahooFinance.suppressNotices(["yahooSurvey"]);
-yahooFinance.setGlobalConfig({ validation: { logErrors: false, logOptionsErrors: false } });
+(yahooFinance as any).suppressNotices?.(["yahooSurvey"]);
+(yahooFinance as any).setGlobalConfig?.({ validation: { logErrors: false, logOptionsErrors: false } });
 
 const QuoteInput = z.object({
   symbols: z.array(z.string().min(1).max(32)).min(1).max(100),
