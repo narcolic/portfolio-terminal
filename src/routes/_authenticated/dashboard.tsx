@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { listPositions } from "@/lib/positions.functions";
 import { listPortfolios } from "@/lib/portfolios.functions";
 import { getQuotes } from "@/lib/quotes.functions";
-import { enrich, fmt, fmtCurrency, fmtPct, type Enriched, type PositionRow } from "@/lib/portfolio";
+import {
+  aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct,
+  type Enriched, type TransactionRow,
+} from "@/lib/portfolio";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
 } from "recharts";
@@ -13,8 +16,6 @@ import {
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
-
-type PositionWithPortfolio = PositionRow & { portfolio_id: string | null };
 
 const ALL = "__all__";
 const UNASSIGNED = "__unassigned__";
@@ -24,7 +25,7 @@ function Dashboard() {
   const listP = useServerFn(listPortfolios);
   const fetchQuotes = useServerFn(getQuotes);
 
-  const positionsQ = useQuery({
+  const txQ = useQuery({
     queryKey: ["positions"],
     queryFn: () => list(),
   });
@@ -35,9 +36,14 @@ function Dashboard() {
 
   const [selected, setSelected] = useState<string>(ALL);
 
+  const positions = useMemo(
+    () => aggregateTransactions((txQ.data ?? []) as TransactionRow[]),
+    [txQ.data],
+  );
+
   const tickers = useMemo(
-    () => Array.from(new Set((positionsQ.data ?? []).map((p) => p.ticker.toUpperCase()))),
-    [positionsQ.data],
+    () => Array.from(new Set(positions.map((p) => p.ticker.toUpperCase()))),
+    [positions],
   );
 
   const quotesQ = useQuery({
@@ -49,11 +55,8 @@ function Dashboard() {
   });
 
   const allRows = useMemo(
-    () => enrich(
-      (positionsQ.data ?? []) as PositionWithPortfolio[],
-      quotesQ.data?.quotes ?? [],
-    ) as (Enriched & { portfolio_id: string | null })[],
-    [positionsQ.data, quotesQ.data],
+    () => enrich(positions, quotesQ.data?.quotes ?? []),
+    [positions, quotesQ.data],
   );
 
   const rows = useMemo(() => {
@@ -69,9 +72,8 @@ function Dashboard() {
 
   const totals = useMemo(() => computeTotals(rows), [rows]);
 
-  // Per-portfolio breakdown (always against ALL rows, independent of filter)
   const byPortfolio = useMemo(() => {
-    const groups = new Map<string, (Enriched & { portfolio_id: string | null })[]>();
+    const groups = new Map<string, Enriched[]>();
     for (const r of allRows) {
       const key = r.portfolio_id ?? UNASSIGNED;
       const arr = groups.get(key) ?? [];
@@ -95,12 +97,10 @@ function Dashboard() {
     [rows],
   );
 
-  if (positionsQ.isLoading) return <Skeleton />;
+  if (txQ.isLoading) return <Skeleton />;
 
-  if ((positionsQ.data ?? []).length === 0) {
-    return (
-      <EmptyState />
-    );
+  if ((txQ.data ?? []).length === 0) {
+    return <EmptyState />;
   }
 
   const tabs = [
@@ -199,7 +199,6 @@ function Dashboard() {
         </Panel>
       </div>
 
-
       {/* Holdings table */}
       <Panel
         title="HOLDINGS"
@@ -219,6 +218,7 @@ function Dashboard() {
                 <Th className="text-right">Day %</Th>
                 <Th className="text-right">Mkt Value</Th>
                 <Th className="text-right">Avg Cost</Th>
+                <Th className="text-right">Tx</Th>
                 <Th className="text-right">Unrealized</Th>
                 <Th className="text-right">P&L %</Th>
               </tr>
@@ -239,6 +239,7 @@ function Dashboard() {
                   </Td>
                   <Td>{fmtCurrency(r.marketValue, r.currency)}</Td>
                   <Td>{fmt(r.avg_cost)}</Td>
+                  <Td>{r.tx_count}</Td>
                   <Td tone={r.unrealized >= 0 ? "bull" : "bear"}>
                     {fmtCurrency(r.unrealized, r.currency)}
                   </Td>
@@ -389,14 +390,14 @@ function Skeleton() {
 function EmptyState() {
   return (
     <div className="border border-dashed border-border p-12 text-center">
-      <div className="text-[10px] uppercase tracking-[0.3em] text-primary">// NO POSITIONS</div>
+      <div className="text-[10px] uppercase tracking-[0.3em] text-primary">// NO TRANSACTIONS</div>
       <h2 className="mt-3 text-2xl">Your portfolio is empty</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Add your first holding to start tracking live values.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Add your first transaction to start tracking live values.</p>
       <Link
         to="/positions"
         className="inline-block mt-6 bg-primary text-primary-foreground px-6 py-2 text-xs uppercase tracking-[0.25em] font-bold hover:opacity-90"
       >
-        &gt; ADD POSITION
+        &gt; ADD TRANSACTION
       </Link>
     </div>
   );

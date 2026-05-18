@@ -36,7 +36,7 @@ function AuthLayout() {
             <div className="font-bold text-primary">▰ PORTFOLIO TERMINAL</div>
             <nav className="hidden md:flex items-center gap-1">
               <NavLink to="/dashboard">Dashboard</NavLink>
-              <NavLink to="/positions">Positions</NavLink>
+              <NavLink to="/positions">Transactions</NavLink>
               <NavLink to="/pnl">P&amp;L</NavLink>
             </nav>
           </div>
@@ -53,7 +53,7 @@ function AuthLayout() {
         </div>
         <nav className="md:hidden flex border-t border-border text-[11px] uppercase tracking-[0.2em]">
           <NavLink to="/dashboard">Dash</NavLink>
-          <NavLink to="/positions">Pos</NavLink>
+          <NavLink to="/positions">Tx</NavLink>
           <NavLink to="/pnl">P&amp;L</NavLink>
         </nav>
       </header>

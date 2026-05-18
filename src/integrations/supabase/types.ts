@@ -44,10 +44,9 @@ export type Database = {
         }
         Relationships: []
       }
-      positions: {
+      transactions: {
         Row: {
           asset_type: string
-          avg_cost: number
           created_at: string
           currency: string
           id: string
@@ -55,14 +54,15 @@ export type Database = {
           name: string | null
           notes: string | null
           portfolio_id: string | null
+          price: number
           shares: number
           ticker: string
+          transaction_date: string
           updated_at: string
           user_id: string
         }
         Insert: {
           asset_type?: string
-          avg_cost?: number
           created_at?: string
           currency?: string
           id?: string
@@ -70,14 +70,15 @@ export type Database = {
           name?: string | null
           notes?: string | null
           portfolio_id?: string | null
+          price?: number
           shares: number
           ticker: string
+          transaction_date?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           asset_type?: string
-          avg_cost?: number
           created_at?: string
           currency?: string
           id?: string
@@ -85,8 +86,10 @@ export type Database = {
           name?: string | null
           notes?: string | null
           portfolio_id?: string | null
+          price?: number
           shares?: number
           ticker?: string
+          transaction_date?: string
           updated_at?: string
           user_id?: string
         }
