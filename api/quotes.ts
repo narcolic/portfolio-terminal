@@ -21,16 +21,16 @@ export default async function handler(req: any, res: any) {
         raw
           .split(",")
           .map((s: string) => s.trim().toUpperCase())
-          .filter(Boolean),
+          .filter((s: string): s is string => s.length > 0),
       ),
-    ).slice(0, 100);
+    ).slice(0, 100) as string[];
 
     if (symbols.length === 0) {
       res.status(200).json({ quotes: [] });
       return;
     }
 
-    const quotes = await yahooFinance.quote(symbols, { return: "array" } as any);
+    const quotes = await yahooFinance.quote(symbols);
     const out = Array.isArray(quotes) ? quotes : [quotes];
     res.status(200).json({ quotes: out });
   } catch (error: any) {
