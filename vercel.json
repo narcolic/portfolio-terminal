@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "builds": [
     {
       "src": "api/**/*.ts",
