@@ -1,13 +1,14 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
-import { hydrateStart } from '@tanstack/start-client-core/client'
+import { getRouter } from './router'
 import './styles.css'
 
 const root = createRoot(document.getElementById('root')!)
+const router = getRouter()
 
-hydrateStart().then((router) => {
-  root.render(<RouterProvider router={router} />)
-}).catch((error) => {
-  console.error('Start hydration failed', error)
-})
+root.render(
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>,
+)

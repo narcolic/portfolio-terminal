@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
-import { listPositions } from "@/lib/positions.functions";
-import { getQuotes } from "@/lib/quotes.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct, type TransactionRow } from "@/lib/portfolio";
 
 export const Route = createFileRoute("/_authenticated/pnl")({
@@ -11,10 +9,18 @@ export const Route = createFileRoute("/_authenticated/pnl")({
 });
 
 function PnL() {
-  const list = useServerFn(listPositions);
-  const fetchQuotes = useServerFn(getQuotes);
-
-  const txQ = useQuery({ queryKey: ["positions"], queryFn: () => list() });
+  // Fetch positions directly from Supabase
+  const txQ = useQuery({
+    queryKey: ["positions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("transaction_date", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
   const positions = useMemo(
     () => aggregateTransactions((txQ.data ?? []) as TransactionRow[]),
     [txQ.data],
@@ -23,12 +29,8 @@ function PnL() {
     () => Array.from(new Set(positions.map((p) => p.ticker.toUpperCase()))),
     [positions],
   );
-  const quotesQ = useQuery({
-    queryKey: ["quotes", tickers],
-    queryFn: () => fetchQuotes({ data: { symbols: tickers } }),
-    enabled: tickers.length > 0,
-    refetchInterval: 5 * 60_000,
-  });
+  // TODO: Implement client-side quote fetching using a public API or Supabase Edge Functions
+  const quotesQ = { data: { quotes: [] } };
 
   const rows = useMemo(
     () => enrich(positions, quotesQ.data?.quotes ?? [])
@@ -46,11 +48,10 @@ function PnL() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl uppercase tracking-[0.2em]">&gt; GAIN / LOSS</h1>
         <button
-          onClick={() => quotesQ.refetch()}
-          disabled={quotesQ.isFetching || tickers.length === 0}
-          className="border border-border bg-card px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
+          className="border border-border bg-card px-4 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
+          disabled={tickers.length === 0}
         >
-          {quotesQ.isFetching ? "syncing…" : "↻ sync"}
+          sync
         </button>
       </div>
 
