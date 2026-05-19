@@ -214,6 +214,10 @@ function Dashboard() {
     () => groupSum(rows, (r) => r.market || r.quote?.exchange || "—", convert),
     [rows, convert],
   );
+  const byCurrency = useMemo(
+    () => groupSumNative(rows, (r) => r._nativeCurrency || "UNKNOWN"),
+    [rows],
+  );
 
   if (txQ.isLoading) return <Skeleton />;
   if ((txQ.data ?? []).length === 0) return <EmptyState />;
@@ -289,12 +293,21 @@ function Dashboard() {
         <Stat label="COST BASIS" value={dispFmt(totals.cost)} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Panel title="ALLOCATION // BY TYPE">
           <Breakdown data={byType} total={totals.mv} chart="pie" display={display} />
         </Panel>
         <Panel title="ALLOCATION // BY MARKET">
           <Breakdown data={byMarket} total={totals.mv} chart="bar" display={display} />
+        </Panel>
+        <Panel title="ALLOCATION // BY CURRENCY">
+          <Breakdown
+            data={byCurrency}
+            total={byCurrency.reduce((sum, item) => sum + item.value, 0)}
+            chart="pie"
+            display={display}
+            formatter={(value, currency) => fmtCurrency(value, currency)}
+          />
         </Panel>
       </div>
 
@@ -333,7 +346,7 @@ function Dashboard() {
                       </div>
                     </td>
                     <Td>{fmt(r.shares, { maximumFractionDigits: 4 })}</Td>
-                    <Td>{fmt(r.price)}</Td>
+                    <Td>{fmtCurrency(r.price, native)}</Td>
                     <Td tone={r.dayChangePct >= 0 ? "bull" : "bear"}>{fmtPct(r.dayChangePct)}</Td>
                     <Td>{dispFmt(mvDisp)}</Td>
                     <Td>{fmt(r.avg_cost)}</Td>
@@ -379,6 +392,14 @@ function groupSum(rows: RowWithNative[], key: (r: RowWithNative) => string, conv
   return Array.from(m, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 }
 
+function groupSumNative(rows: RowWithNative[], key: (r: RowWithNative) => string) {
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    m.set(key(r), (m.get(key(r)) ?? 0) + r.marketValue);
+  }
+  return Array.from(m, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+}
+
 const COLORS = [
   "var(--color-primary)",
   "var(--color-bull)",
@@ -390,8 +411,8 @@ const COLORS = [
 ];
 
 function Breakdown({
-  data, total, chart, display,
-}: { data: { name: string; value: number }[]; total: number; chart: "pie" | "bar"; display: Display }) {
+  data, total, chart, display, formatter,
+}: { data: { name: string; value: number }[]; total: number; chart: "pie" | "bar"; display: Display; formatter?: (value: number, name: string) => string }) {
   if (data.length === 0) return <div className="text-muted-foreground text-xs">No data</div>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -436,7 +457,7 @@ function Breakdown({
                 <span className="uppercase text-[11px]">{d.name}</span>
               </div>
               <div className="text-right">
-                <div>{fmtCurrency(d.value, display)}</div>
+                <div>{formatter ? formatter(d.value, d.name) : fmtCurrency(d.value, display)}</div>
                 <div className="text-[10px] text-muted-foreground">{pct.toFixed(1)}%</div>
               </div>
             </div>

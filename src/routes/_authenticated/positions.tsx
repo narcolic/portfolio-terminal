@@ -314,21 +314,6 @@ function TransactionsPage() {
             {importM.isPending ? "Importing..." : "Upload CSV"}
           </button>
 
-          <a
-            href={`data:text/csv;charset=utf-8,${encodeURIComponent(
-              "transaction_date,ticker,name,asset_type,market,currency,shares,price,portfolio,notes\n" +
-                "2024-01-15,AAPL,Apple Inc.,stock,NASDAQ,USD,10,150.20,IBKR,initial buy\n" +
-                "2024-06-03,AAPL,Apple Inc.,stock,NASDAQ,USD,5,185.40,IBKR,add\n" +
-                "2024-03-10,AIR.PA,Airbus SE,stock,EPA,EUR,5,128.40,Degiro,\n" +
-                "2024-02-20,VOD.L,Vodafone,stock,LSE,GBP,100,0.75,IBKR,\n" +
-                "2023-11-01,BTC-USD,Bitcoin,crypto,CRYPTO,USD,0.5,35000,Coinbase,long term\n"
-            )}`}
-            download="transactions-template.csv"
-            className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
-          >
-            Template
-          </a>
-
           <button
             onClick={() => setEditing(empty())}
             className="bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground hover:opacity-90"
@@ -347,8 +332,8 @@ function TransactionsPage() {
             <strong className="text-foreground">Required columns:</strong> ticker, shares, price.
           </p>
           <p>
-            <strong className="text-foreground">Optional:</strong> transaction_date, name, asset_type, market,
-            currency, portfolio, notes.
+            <strong className="text-foreground">Optional:</strong> transaction_date, portfolio, asset_type, market,
+            currency, notes.
           </p>
           <p>
             <strong className="text-foreground">Tickers:</strong> AAPL, AIR.PA, VOD.L, BTC-USD.
