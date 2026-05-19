@@ -4,12 +4,114 @@
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
+import tailwind from "@tailwindcss/vite";
+import path from "path";
+import YahooFinance from "yahoo-finance2";
 
-// Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-// @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
+const yahooFinance = new YahooFinance({
+  suppressNotices: ["yahooSurvey"],
+  validation: {
+    logErrors: false,
+    logOptionsErrors: false,
+  },
+});
+
+const esbuildAliasMap = new Map([
+  ["#tanstack-router-entry", path.resolve(__dirname, "src/tanstack-router-entry.ts")],
+  ["#tanstack-start-entry", path.resolve(__dirname, "src/tanstack-start-entry.ts")],
+  ["#tanstack-start-plugin-adapters", path.resolve(__dirname, "src/tanstack-start-plugin-adapters.ts")],
+  ["tanstack-start-manifest:v", path.resolve(__dirname, "src/tanstack-start-manifest.ts")],
+  ["tanstack-start-injected-head-scripts:v", path.resolve(__dirname, "src/tanstack-start-injected-head-scripts.ts")],
+  ["node:async_hooks", path.resolve(__dirname, "src/node-async-hooks.ts")],
+  ["node:stream/web", path.resolve(__dirname, "src/node-stream-web.ts")],
+  ["node:stream", path.resolve(__dirname, "src/node-stream.ts")],
+]);
+
+function createEsbuildAliasPlugin() {
+  return {
+    name: "esbuild-alias-plugin",
+    setup(build: any) {
+      build.onResolve({ filter: /^(#tanstack-router-entry|#tanstack-start-entry|#tanstack-start-plugin-adapters|tanstack-start-manifest:v|tanstack-start-injected-head-scripts:v|node:async_hooks|node:stream\/web|node:stream)$/ }, (args: any) => {
+        const replacement = esbuildAliasMap.get(args.path);
+        if (replacement) {
+          return { path: replacement };
+        }
+      });
+    },
+  };
+}
+
+function createQuotesApiDevPlugin() {
+  return {
+    name: "quotes-api-dev-plugin",
+    configureServer(server: any) {
+      server.middlewares.use("/api/quotes", async (req: any, res: any) => {
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        try {
+          const url = new URL(req.url ?? "", "http://localhost");
+          const raw = url.searchParams.get("symbols") ?? "";
+          const symbols = Array.from(
+            new Set(
+              raw
+                .split(",")
+                .map((s) => s.trim().toUpperCase())
+                .filter(Boolean),
+            ),
+          ).slice(0, 100);
+
+          if (symbols.length === 0) {
+            res.statusCode = 200;
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify({ quotes: [] }));
+            return;
+          }
+
+          const quotes = await yahooFinance.quote(symbols, { return: "array" } as any);
+          const out = Array.isArray(quotes) ? quotes : [quotes];
+          res.statusCode = 200;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ quotes: out }));
+        } catch (error: any) {
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: error?.message ?? "Quote lookup failed" }));
+        }
+      });
+    },
+  };
+}
+
+// Basic Vite config for Vercel deployment (no Lovable/Cloudflare plugins)
 export default defineConfig({
-  tanstackStart: {
-    server: { entry: "server" },
+  plugins: [react(), tsconfigPaths(), tailwind(), createQuotesApiDevPlugin()],
+  resolve: {
+    conditions: ["browser"],
+    alias: [
+      { find: "#tanstack-router-entry", replacement: path.resolve(__dirname, "src/tanstack-router-entry.ts") },
+      { find: "#tanstack-start-entry", replacement: path.resolve(__dirname, "src/tanstack-start-entry.ts") },
+      { find: "#tanstack-start-plugin-adapters", replacement: path.resolve(__dirname, "src/tanstack-start-plugin-adapters.ts") },
+      { find: "tanstack-start-manifest:v", replacement: path.resolve(__dirname, "src/tanstack-start-manifest.ts") },
+      { find: "tanstack-start-injected-head-scripts:v", replacement: path.resolve(__dirname, "src/tanstack-start-injected-head-scripts.ts") },
+      { find: "node:async_hooks", replacement: path.resolve(__dirname, "src/node-async-hooks.ts") },
+      { find: "node:stream/web", replacement: path.resolve(__dirname, "src/node-stream-web.ts") },
+      { find: "node:stream", replacement: path.resolve(__dirname, "src/node-stream.ts") },
+    ],
+  },
+  define: {
+    'process.env': {},
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      plugins: [createEsbuildAliasPlugin()],
+    },
   },
 });

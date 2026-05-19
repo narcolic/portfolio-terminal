@@ -19,87 +19,14 @@ export type TransactionInputType = z.infer<typeof TransactionInput>;
 // Back-compat alias used by some imports
 export type PositionInputType = TransactionInputType;
 
-export const listPositions = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("transactions")
-      .select("*")
-      .order("transaction_date", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
+// listPositions: Implement client-side fetching using Supabase client SDK for static hosting.
 
-export const createPosition = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) => TransactionInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { error, data: row } = await context.supabase
-      .from("transactions")
-      .insert({ ...data, ticker: data.ticker.toUpperCase(), user_id: context.userId })
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
-  });
+// createPosition: Implement client-side mutation using Supabase client SDK for static hosting.
 
-export const updatePosition = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    TransactionInput.extend({ id: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const { id, ...rest } = data;
-    const { error, data: row } = await context.supabase
-      .from("transactions")
-      .update({ ...rest, ticker: rest.ticker.toUpperCase() })
-      .eq("id", id)
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
-  });
+// updatePosition: Implement client-side mutation using Supabase client SDK for static hosting.
 
-export const deletePosition = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("transactions").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+// deletePosition: Implement client-side mutation using Supabase client SDK for static hosting.
 
-export const bulkImportPositions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({
-      rows: z.array(TransactionInput).min(1).max(1000),
-    }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const payload = data.rows.map((r) => ({
-      ...r,
-      ticker: r.ticker.toUpperCase(),
-      user_id: context.userId,
-    }));
-    const { error, data: rows } = await context.supabase
-      .from("transactions")
-      .insert(payload)
-      .select();
-    if (error) throw new Error(error.message);
-    return { inserted: rows?.length ?? 0 };
-  });
+// bulkImportPositions: Implement client-side mutation using Supabase client SDK for static hosting.
 
-export const bulkDeletePositions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ ids: z.array(z.string().uuid()).min(1) }).parse(input)
-  )
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("transactions")
-      .delete()
-      .in("id", data.ids);
-    if (error) throw new Error(error.message);
-    return { deleted: data.ids.length };
-  });
+// bulkDeletePositions: Implement client-side mutation using Supabase client SDK for static hosting.

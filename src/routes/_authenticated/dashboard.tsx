@@ -1,14 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
-import { listPositions } from "@/lib/positions.functions";
-import { listPortfolios } from "@/lib/portfolios.functions";
-import { getQuotes, getFxRates } from "@/lib/quotes.functions";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct,
   type Enriched, type TransactionRow,
 } from "@/lib/portfolio";
+import { getQuotesClient } from "@/lib/quotes.functions";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
 } from "recharts";
@@ -20,16 +18,33 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 const ALL = "__all__";
 const UNASSIGNED = "__unassigned__";
 
-type Display = "USD" | "EUR";
+type Display = string;
 
 function Dashboard() {
-  const list = useServerFn(listPositions);
-  const listP = useServerFn(listPortfolios);
-  const fetchQuotes = useServerFn(getQuotes);
-  const fetchFx = useServerFn(getFxRates);
-
-  const txQ = useQuery({ queryKey: ["positions"], queryFn: () => list() });
-  const portfoliosQ = useQuery({ queryKey: ["portfolios"], queryFn: () => listP() });
+  // Fetch positions directly from Supabase
+  const txQ = useQuery({
+    queryKey: ["positions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("transaction_date", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  // Fetch portfolios directly from Supabase
+  const portfoliosQ = useQuery({
+    queryKey: ["portfolios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("portfolios")
+        .select("*")
+        .order("name", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
 
   const [selected, setSelected] = useState<string>(ALL);
   const [display, setDisplay] = useState<Display>("USD");
@@ -45,11 +60,12 @@ function Dashboard() {
   );
 
   const quotesQ = useQuery({
-    queryKey: ["quotes", tickers],
-    queryFn: () => fetchQuotes({ data: { symbols: tickers } }),
+    queryKey: ["quotes", tickers.join(",")],
+    queryFn: () => getQuotesClient(tickers),
     enabled: tickers.length > 0,
-    refetchInterval: 5 * 60_000,
-    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
   });
 
   const allRows = useMemo(
@@ -57,30 +73,78 @@ function Dashboard() {
     [positions, quotesQ.data],
   );
 
-  // Collect currencies from positions + quote-currency overrides
-  const currencies = useMemo(() => {
-    const s = new Set<string>(["USD", "EUR"]);
-    for (const r of allRows) {
-      s.add((r.quote?.currency ?? r.currency ?? "USD").toUpperCase());
+  const transactionCurrencies = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of positions) {
+      const c = (p.currency || "").toUpperCase();
+      if (c) s.add(c);
     }
-    return [...s];
-  }, [allRows]);
+    return s.size ? [...s].sort() : ["USD"];
+  }, [positions]);
+
+  const fxWanted = useMemo(
+    () => Array.from(new Set(["USD", "EUR", ...transactionCurrencies])).sort(),
+    [transactionCurrencies],
+  );
 
   const fxQ = useQuery({
-    queryKey: ["fx", currencies],
-    queryFn: () => fetchFx({ data: { currencies } }),
-    enabled: currencies.length > 0,
-    refetchInterval: 5 * 60_000,
+    queryKey: ["fx-rates", fxWanted.join(",")],
+    queryFn: async () => {
+      const wanted = Array.from(new Set(fxWanted.map((c) => c.toUpperCase())));
+
+      const toUsdPerUnit = (allRates: Record<string, number>) => {
+        const rates: Record<string, number> = { USD: 1 };
+        for (const c of wanted) {
+          if (c === "USD") continue;
+          const usdToC = Number(allRates[c]);
+          if (Number.isFinite(usdToC) && usdToC > 0) {
+            rates[c] = 1 / usdToC;
+          }
+        }
+        return rates;
+      };
+
+      try {
+        // Fetch full USD base table to avoid failures from unsupported target codes.
+        const url = "https://api.frankfurter.app/latest?from=USD";
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = (await response.json()) as { rates?: Record<string, number> };
+          if (data.rates) {
+            return { rates: toUsdPerUnit(data.rates) };
+          }
+        }
+      } catch {
+        // fallback below
+      }
+
+      try {
+        // Fallback provider
+        const response = await fetch("https://open.er-api.com/v6/latest/USD");
+        if (response.ok) {
+          const data = (await response.json()) as { rates?: Record<string, number> };
+          if (data.rates) {
+            return { rates: toUsdPerUnit(data.rates) };
+          }
+        }
+      } catch {
+        // final fallback below
+      }
+
+      return { rates: { USD: 1, EUR: 1 } };
+    },
+    staleTime: 10 * 60_000,
+    gcTime: 24 * 60 * 60_000,
   });
 
   // rates[X] = USD per 1 X
-  const rates = fxQ.data?.rates ?? { USD: 1 };
+  const rates: Record<string, number> = fxQ.data?.rates ?? { USD: 1 };
 
   const convert = useMemo(() => {
-    const dispRate = rates[display]; // USD per 1 display unit
+    const dispRate = rates[display] ?? 1; // USD per 1 display unit
     return (amount: number, from: string) => {
       const f = (from || "USD").toUpperCase();
-      const fromRate = rates[f]; // USD per 1 from
+      const fromRate = rates[f] ?? 1; // USD per 1 from
       if (!fromRate || !dispRate) return amount; // missing — leave as-is
       const inUsd = amount * fromRate;
       return inUsd / dispRate;
@@ -100,6 +164,24 @@ function Dashboard() {
     if (selected === UNASSIGNED) return convRows.filter((r) => !r.portfolio_id);
     return convRows.filter((r) => r.portfolio_id === selected);
   }, [convRows, selected]);
+
+  const displayCurrencies = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) {
+      const c = (r.currency || "").toUpperCase();
+      if (c) s.add(c);
+    }
+    if (s.size === 0) {
+      for (const c of transactionCurrencies) s.add(c);
+    }
+    return [...s].sort();
+  }, [rows, transactionCurrencies]);
+
+  useEffect(() => {
+    if (!displayCurrencies.includes(display)) {
+      setDisplay(displayCurrencies[0] ?? "USD");
+    }
+  }, [display, displayCurrencies]);
 
   const portfolioMap = useMemo(
     () => new Map((portfoliosQ.data ?? []).map((p) => [p.id, p.name])),
@@ -131,6 +213,10 @@ function Dashboard() {
   const byMarket = useMemo(
     () => groupSum(rows, (r) => r.market || r.quote?.exchange || "—", convert),
     [rows, convert],
+  );
+  const byCurrency = useMemo(
+    () => groupSumNative(rows, (r) => r._nativeCurrency || "UNKNOWN"),
+    [rows],
   );
 
   if (txQ.isLoading) return <Skeleton />;
@@ -166,14 +252,16 @@ function Dashboard() {
           </div>
         </div>
         <button
-          onClick={() => quotesQ.refetch()}
-          disabled={quotesQ.isFetching || tickers.length === 0}
+          onClick={() => {
+            quotesQ.refetch();
+          }}
+          disabled={tickers.length === 0}
           className="border border-border bg-card px-4 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
         >
-          {quotesQ.isFetching ? "syncing…" : "↻ sync"}
+          sync
         </button>
         <div className="border border-border bg-card flex">
-          {(["USD", "EUR"] as Display[]).map((c) => (
+          {displayCurrencies.map((c) => (
             <button
               key={c}
               onClick={() => setDisplay(c)}
@@ -205,61 +293,28 @@ function Dashboard() {
         <Stat label="COST BASIS" value={dispFmt(totals.cost)} />
       </div>
 
-      {(quotesQ.data?.error || fxQ.data?.error) && (
-        <div className="border border-amber/40 bg-amber/10 px-3 py-2 text-[11px] text-amber uppercase tracking-widest">
-          ⚠ {quotesQ.data?.error || fxQ.data?.error} — showing best available data
-        </div>
-      )}
-
-      {selected === ALL && byPortfolio.length > 1 && (
-        <Panel title="BY PORTFOLIO">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
-              <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                <tr className="border-b border-border">
-                  <Th className="text-left">Portfolio</Th>
-                  <Th className="text-right">Positions</Th>
-                  <Th className="text-right">Value ({display})</Th>
-                  <Th className="text-right">% of Total</Th>
-                  <Th className="text-right">Day P&L</Th>
-                  <Th className="text-right">Unrealized</Th>
-                  <Th className="text-right">P&L %</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {byPortfolio.map((g) => (
-                  <tr key={g.id} className="border-b border-border/60 hover:bg-secondary/40 cursor-pointer"
-                    onClick={() => setSelected(g.id)}>
-                    <td className="py-2 px-2 font-bold text-primary">{g.name}</td>
-                    <Td>{g.count}</Td>
-                    <Td>{dispFmt(g.mv)}</Td>
-                    <Td>{totals.mv ? ((g.mv / totals.mv) * 100).toFixed(1) : "0.0"}%</Td>
-                    <Td tone={g.dayChange >= 0 ? "bull" : "bear"}>{dispFmt(g.dayChange)}</Td>
-                    <Td tone={g.unrealized >= 0 ? "bull" : "bear"}>{dispFmt(g.unrealized)}</Td>
-                    <Td tone={g.unrealizedPct >= 0 ? "bull" : "bear"}>{fmtPct(g.unrealizedPct)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Panel title="ALLOCATION // BY TYPE">
           <Breakdown data={byType} total={totals.mv} chart="pie" display={display} />
         </Panel>
         <Panel title="ALLOCATION // BY MARKET">
           <Breakdown data={byMarket} total={totals.mv} chart="bar" display={display} />
         </Panel>
+        <Panel title="ALLOCATION // BY CURRENCY">
+          <Breakdown
+            data={byCurrency}
+            total={byCurrency.reduce((sum, item) => sum + item.value, 0)}
+            chart="pie"
+            display={display}
+            formatter={(value, currency) => fmtCurrency(value, currency)}
+          />
+        </Panel>
       </div>
 
       <Panel
         title="HOLDINGS"
         actions={
-          <span className="text-[10px] text-muted-foreground">
-            {quotesQ.isFetching ? "syncing…" : `${rows.length} positions · ${display}`}
-          </span>
+          <span className="text-[10px] text-muted-foreground">{`${rows.length} positions · ${display}`}</span>
         }
       >
         <div className="overflow-x-auto">
@@ -291,7 +346,7 @@ function Dashboard() {
                       </div>
                     </td>
                     <Td>{fmt(r.shares, { maximumFractionDigits: 4 })}</Td>
-                    <Td>{fmt(r.price)}</Td>
+                    <Td>{fmtCurrency(r.price, native)}</Td>
                     <Td tone={r.dayChangePct >= 0 ? "bull" : "bear"}>{fmtPct(r.dayChangePct)}</Td>
                     <Td>{dispFmt(mvDisp)}</Td>
                     <Td>{fmt(r.avg_cost)}</Td>
@@ -337,6 +392,14 @@ function groupSum(rows: RowWithNative[], key: (r: RowWithNative) => string, conv
   return Array.from(m, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 }
 
+function groupSumNative(rows: RowWithNative[], key: (r: RowWithNative) => string) {
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    m.set(key(r), (m.get(key(r)) ?? 0) + r.marketValue);
+  }
+  return Array.from(m, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+}
+
 const COLORS = [
   "var(--color-primary)",
   "var(--color-bull)",
@@ -348,8 +411,8 @@ const COLORS = [
 ];
 
 function Breakdown({
-  data, total, chart, display,
-}: { data: { name: string; value: number }[]; total: number; chart: "pie" | "bar"; display: Display }) {
+  data, total, chart, display, formatter,
+}: { data: { name: string; value: number }[]; total: number; chart: "pie" | "bar"; display: Display; formatter?: (value: number, name: string) => string }) {
   if (data.length === 0) return <div className="text-muted-foreground text-xs">No data</div>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -362,6 +425,9 @@ function Breakdown({
               </Pie>
               <Tooltip
                 contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                wrapperStyle={{ color: "var(--color-foreground)" }}
+                labelStyle={{ color: "var(--color-foreground)" }}
+                itemStyle={{ color: "var(--color-foreground)" }}
                 formatter={(v: number) => fmtCurrency(v, display)}
               />
             </PieChart>
@@ -371,6 +437,9 @@ function Breakdown({
               <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} />
               <Tooltip
                 contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                wrapperStyle={{ color: "var(--color-foreground)" }}
+                labelStyle={{ color: "var(--color-foreground)" }}
+                itemStyle={{ color: "var(--color-foreground)" }}
                 formatter={(v: number) => fmtCurrency(v, display)}
               />
               <Bar dataKey="value" fill="var(--color-primary)" />
@@ -388,7 +457,7 @@ function Breakdown({
                 <span className="uppercase text-[11px]">{d.name}</span>
               </div>
               <div className="text-right">
-                <div>{fmtCurrency(d.value, display)}</div>
+                <div>{formatter ? formatter(d.value, d.name) : fmtCurrency(d.value, display)}</div>
                 <div className="text-[10px] text-muted-foreground">{pct.toFixed(1)}%</div>
               </div>
             </div>

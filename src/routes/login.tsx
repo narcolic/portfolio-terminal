@@ -1,30 +1,30 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+export { LoginPage };
+
 function LoginPage() {
-  const nav = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) nav({ to: "/dashboard" });
-    });
-  }, [nav]);
+  const { user, loading } = useAuth();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+        toast.error('Supabase not configured locally');
+        return;
+      }
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -36,7 +36,6 @@ function LoginPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        nav({ to: "/dashboard" });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
@@ -47,17 +46,58 @@ function LoginPage() {
 
   const google = async () => {
     setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
+    try {
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+        toast.error('Supabase not configured locally');
+        setBusy(false);
+        return;
+      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      } as any);
+      if (error) throw error;
+      // The provider will redirect the browser for OAuth; nothing further needed here.
+    } catch (err) {
       toast.error("Google sign-in failed");
       setBusy(false);
-      return;
     }
-    if (result.redirected) return;
-    nav({ to: "/dashboard" });
   };
+
+  if (loading) {
+    return (
+      <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
+        <div className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Loading authentication…</div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
+        <div className="relative w-full max-w-md border border-border bg-card p-6">
+          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">AUTHENTICATED</div>
+          <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
+          <p className="mt-3 text-sm text-muted-foreground">You are signed in as <span className="font-semibold text-primary">{user.email ?? user.id}</span>.</p>
+          <div className="mt-6 space-y-3">
+            <button
+              type="button"
+              onClick={async () => {
+                setBusy(true);
+                await supabase.auth.signOut();
+                window.location.reload();
+              }}
+              disabled={busy}
+              className="w-full bg-primary text-primary-foreground py-2 text-xs uppercase tracking-[0.25em] font-bold hover:opacity-90 disabled:opacity-50"
+            >
+              &gt; SIGN OUT
+            </button>
+            <a href="/" className="block text-center text-[10px] uppercase tracking-[0.25em] text-primary hover:underline">&lt; back to login</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
@@ -131,7 +171,7 @@ function LoginPage() {
         </div>
 
         <div className="mt-4 text-[10px] text-muted-foreground text-center">
-          <Link to="/" className="hover:text-primary">&lt; back</Link>
+          <a href="/" className="hover:text-primary">&lt; back</a>
         </div>
       </div>
     </div>

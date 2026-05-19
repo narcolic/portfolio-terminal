@@ -42,7 +42,13 @@ function AuthLayout() {
           </div>
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
             <span className="hidden sm:inline">
-              {now.toUTCString().slice(17, 25)} UTC
+              {now.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+                timeZoneName: "short",
+              })}
             </span>
             <span className="hidden sm:inline text-bull ticker-blink">● LIVE</span>
             <span className="hidden md:inline truncate max-w-[160px]">{user?.email}</span>
