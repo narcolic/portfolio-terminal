@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getQuotesClient } from "@/lib/quotes.functions";
 import { aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct, type TransactionRow } from "@/lib/portfolio";
 
 export const Route = createFileRoute("/_authenticated/pnl")({
@@ -29,8 +30,11 @@ function PnL() {
     () => Array.from(new Set(positions.map((p) => p.ticker.toUpperCase()))),
     [positions],
   );
-  // TODO: Implement client-side quote fetching using a public API or Supabase Edge Functions
-  const quotesQ = { data: { quotes: [] } };
+  const quotesQ = useQuery({
+    queryKey: ["quotes", tickers.join(",")],
+    queryFn: () => getQuotesClient(tickers),
+    enabled: tickers.length > 0,
+  });
 
   const rows = useMemo(
     () => enrich(positions, quotesQ.data?.quotes ?? [])
@@ -50,6 +54,7 @@ function PnL() {
         <button
           className="border border-border bg-card px-4 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
           disabled={tickers.length === 0}
+          onClick={() => quotesQ.refetch()}
         >
           sync
         </button>
