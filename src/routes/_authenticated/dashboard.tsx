@@ -404,6 +404,9 @@ function Breakdown({
               </Pie>
               <Tooltip
                 contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                wrapperStyle={{ color: "var(--color-foreground)" }}
+                labelStyle={{ color: "var(--color-foreground)" }}
+                itemStyle={{ color: "var(--color-foreground)" }}
                 formatter={(v: number) => fmtCurrency(v, display)}
               />
             </PieChart>
@@ -413,6 +416,9 @@ function Breakdown({
               <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} />
               <Tooltip
                 contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                wrapperStyle={{ color: "var(--color-foreground)" }}
+                labelStyle={{ color: "var(--color-foreground)" }}
+                itemStyle={{ color: "var(--color-foreground)" }}
                 formatter={(v: number) => fmtCurrency(v, display)}
               />
               <Bar dataKey="value" fill="var(--color-primary)" />
