@@ -9,6 +9,15 @@ import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import tailwind from "@tailwindcss/vite";
 import path from "path";
+import YahooFinance from "yahoo-finance2";
+
+const yahooFinance = new YahooFinance({
+  suppressNotices: ["yahooSurvey"],
+  validation: {
+    logErrors: false,
+    logOptionsErrors: false,
+  },
+});
 
 const esbuildAliasMap = new Map([
   ["#tanstack-router-entry", path.resolve(__dirname, "src/tanstack-router-entry.ts")],
@@ -35,9 +44,55 @@ function createEsbuildAliasPlugin() {
   };
 }
 
+function createQuotesApiDevPlugin() {
+  return {
+    name: "quotes-api-dev-plugin",
+    configureServer(server: any) {
+      server.middlewares.use("/api/quotes", async (req: any, res: any) => {
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        try {
+          const url = new URL(req.url ?? "", "http://localhost");
+          const raw = url.searchParams.get("symbols") ?? "";
+          const symbols = Array.from(
+            new Set(
+              raw
+                .split(",")
+                .map((s) => s.trim().toUpperCase())
+                .filter(Boolean),
+            ),
+          ).slice(0, 100);
+
+          if (symbols.length === 0) {
+            res.statusCode = 200;
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify({ quotes: [] }));
+            return;
+          }
+
+          const quotes = await yahooFinance.quote(symbols, { return: "array" } as any);
+          const out = Array.isArray(quotes) ? quotes : [quotes];
+          res.statusCode = 200;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ quotes: out }));
+        } catch (error: any) {
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: error?.message ?? "Quote lookup failed" }));
+        }
+      });
+    },
+  };
+}
+
 // Basic Vite config for Vercel deployment (no Lovable/Cloudflare plugins)
 export default defineConfig({
-  plugins: [react(), tsconfigPaths(), tailwind()],
+  plugins: [react(), tsconfigPaths(), tailwind(), createQuotesApiDevPlugin()],
   resolve: {
     conditions: ["browser"],
     alias: [

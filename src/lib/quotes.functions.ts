@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+// import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 
@@ -49,65 +49,92 @@ function normalize(input: string, raw: any): Quote | null {
   };
 }
 
-export const getQuotes = createServerFn({ method: "POST" })
-  .inputValidator((input) => QuoteInput.parse(input))
-  .handler(async ({ data }): Promise<{ quotes: Quote[]; error: string | null }> => {
-    const now = Date.now();
-    const need: string[] = [];
-    const cached = new Map<string, Quote>();
-    for (const s of data.symbols) {
-      const up = s.toUpperCase();
-      const hit = QUOTE_CACHE.get(up);
-      if (hit && now - hit.ts < TTL_MS) cached.set(up, hit.quote);
-      else need.push(up);
+async function fetchYahooQuotes(symbols: string[]): Promise<Quote[]> {
+  if (symbols.length === 0) return [];
+
+  const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`);
+  if (!response.ok) {
+    throw new Error(`Quote API error (${response.status})`);
+  }
+
+  const json = (await response.json()) as {
+    quotes?: any[];
+  };
+  const rows = json.quotes ?? [];
+
+  const bySymbol = new Map<string, any>();
+  for (const row of rows) {
+    const symbol = String(row?.symbol ?? "").toUpperCase();
+    if (symbol) bySymbol.set(symbol, row);
+  }
+
+  const out: Quote[] = [];
+  for (const input of symbols) {
+    const raw = bySymbol.get(input.toUpperCase());
+    const q = normalize(input, raw);
+    if (q) out.push(q);
+  }
+  return out;
+}
+
+export async function getQuotesClient(symbols: string[]): Promise<{ quotes: Quote[] }> {
+  const parsed = QuoteInput.parse({ symbols });
+  const unique = Array.from(new Set(parsed.symbols.map((s) => s.toUpperCase())));
+  const now = Date.now();
+
+  const quoteBySymbol = new Map<string, Quote>();
+  const staleSymbols: string[] = [];
+  const missingSymbols: string[] = [];
+
+  for (const symbol of unique) {
+    const cached = QUOTE_CACHE.get(symbol);
+    if (!cached) {
+      missingSymbols.push(symbol);
+      continue;
     }
 
-    let raw: any[] = [];
-    let fetchErr = false;
-    if (need.length > 0) {
-      try {
-        const { fetchYahooQuotes } = await import("./yahoo.server");
-        raw = await fetchYahooQuotes(need);
-      } catch (e) {
-        console.error("yahoo-finance2 quote failed:", e);
-        fetchErr = true;
+    const age = now - cached.ts;
+    if (age <= TTL_MS) {
+      quoteBySymbol.set(symbol, cached.quote);
+      continue;
+    }
+
+    if (age <= STALE_MS) {
+      quoteBySymbol.set(symbol, cached.quote);
+      staleSymbols.push(symbol);
+      continue;
+    }
+
+    missingSymbols.push(symbol);
+  }
+
+  const toFetch = Array.from(new Set([...missingSymbols, ...staleSymbols]));
+  if (toFetch.length > 0) {
+    try {
+      const batches: string[][] = [];
+      for (let i = 0; i < toFetch.length; i += 50) {
+        batches.push(toFetch.slice(i, i + 50));
       }
-    }
 
-    const byInput = new Map<string, any>();
-    for (const r of raw) {
-      const sym = String(r?.symbol ?? "").toUpperCase();
-      if (sym) byInput.set(sym, r);
-    }
-
-    const quotes: Quote[] = [];
-    let anyStale = false;
-    for (const s of data.symbols) {
-      const up = s.toUpperCase();
-      if (cached.has(up)) {
-        quotes.push(cached.get(up)!);
-        continue;
-      }
-      const q = normalize(up, byInput.get(up));
-      if (q) {
-        QUOTE_CACHE.set(up, { quote: q, ts: now });
-        quotes.push(q);
-      } else {
-        const hit = QUOTE_CACHE.get(up);
-        if (hit && now - hit.ts < STALE_MS) {
-          quotes.push(hit.quote);
-          anyStale = true;
+      for (const batch of batches) {
+        const fresh = await fetchYahooQuotes(batch);
+        for (const quote of fresh) {
+          QUOTE_CACHE.set(quote.inputSymbol.toUpperCase(), { quote, ts: Date.now() });
+          quoteBySymbol.set(quote.inputSymbol.toUpperCase(), quote);
+          quoteBySymbol.set(quote.symbol.toUpperCase(), quote);
         }
       }
+    } catch {
+      // Keep stale cache values when live refresh fails.
     }
+  }
 
-    const missing = data.symbols.length - quotes.length;
-    let error: string | null = null;
-    if (quotes.length === 0 && (fetchErr || need.length > 0)) error = "Quote service unavailable";
-    else if (missing > 0) error = `${missing} symbol(s) could not be priced — check ticker`;
-    else if (anyStale) error = "Some quotes are stale";
-    return { quotes, error };
-  });
+  return {
+    quotes: unique
+      .map((symbol) => quoteBySymbol.get(symbol))
+      .filter((q): q is Quote => Boolean(q)),
+  };
+}
 
 // ===== FX rates via Frankfurter (ECB, free, no key) =====
 const FxInput = z.object({
@@ -119,37 +146,7 @@ let FX_CACHE: FxCache | null = null;
 const FX_TTL_MS = 10 * 60_000;
 const FX_STALE_MS = 24 * 60 * 60_000;
 
-export const getFxRates = createServerFn({ method: "POST" })
-  .inputValidator((input) => FxInput.parse(input))
-  .handler(async ({ data }): Promise<{ rates: Record<string, number>; error: string | null }> => {
-    const set = new Set(data.currencies.map((c) => c.toUpperCase()));
-    set.add("USD");
-    set.add("EUR");
-    const wanted = [...set];
-    const now = Date.now();
-    if (FX_CACHE && now - FX_CACHE.ts < FX_TTL_MS) {
-      return { rates: pickRates(FX_CACHE.rates, wanted), error: null };
-    }
-    const symbols = wanted.filter((c) => c !== "USD").join(",");
-    const url = `https://api.frankfurter.dev/v1/latest?base=USD&symbols=${encodeURIComponent(symbols)}`;
-    try {
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error(`fx ${res.status}`);
-      const json: any = await res.json();
-      const usdPerUnit: Record<string, number> = { USD: 1 };
-      for (const [code, perUsd] of Object.entries(json?.rates ?? {})) {
-        const n = Number(perUsd);
-        if (Number.isFinite(n) && n > 0) usdPerUnit[code] = 1 / n;
-      }
-      FX_CACHE = { rates: usdPerUnit, ts: now };
-      return { rates: pickRates(usdPerUnit, wanted), error: null };
-    } catch {
-      if (FX_CACHE && now - FX_CACHE.ts < FX_STALE_MS) {
-        return { rates: pickRates(FX_CACHE.rates, wanted), error: "FX rates stale" };
-      }
-      return { rates: { USD: 1 }, error: "FX rates unavailable" };
-    }
-  });
+// getFxRates: Implement client-side fetching using a public API as needed for static hosting.
 
 function pickRates(all: Record<string, number>, wanted: string[]): Record<string, number> {
   const out: Record<string, number> = {};
