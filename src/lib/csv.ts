@@ -9,34 +9,66 @@ export function parseCSV(text: string): string[][] {
     const c = src[i];
     if (inQuotes) {
       if (c === '"') {
-        if (src[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
+        if (src[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQuotes = false;
       } else field += c;
     } else {
       if (c === '"') inQuotes = true;
-      else if (c === ",") { row.push(field); field = ""; }
-      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-      else if (c === "\r") { /* skip */ }
-      else field += c;
+      else if (c === ",") {
+        row.push(field);
+        field = "";
+      } else if (c === "\n") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+      } else if (c === "\r") {
+        /* skip */
+      } else field += c;
     }
   }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows.filter((r) => r.some((x) => x.trim() !== ""));
 }
 
 const ALIASES: Record<string, string> = {
-  symbol: "ticker", code: "ticker", isin: "ticker", security: "ticker",
-  qty: "shares", quantity: "shares", units: "shares", position: "shares",
-  cost: "price", "avg_cost": "price", "avg cost": "price", "average cost": "price",
-  "cost basis": "price", "buy price": "price", "unit price": "price",
-  type: "asset_type", category: "asset_type", "asset type": "asset_type",
-  exchange: "market", venue: "market",
+  symbol: "ticker",
+  code: "ticker",
+  isin: "ticker",
+  security: "ticker",
+  qty: "shares",
+  quantity: "shares",
+  units: "shares",
+  position: "shares",
+  cost: "price",
+  avg_cost: "price",
+  "avg cost": "price",
+  "average cost": "price",
+  "cost basis": "price",
+  "buy price": "price",
+  "unit price": "price",
+  type: "asset_type",
+  category: "asset_type",
+  "asset type": "asset_type",
+  exchange: "market",
+  venue: "market",
   ccy: "currency",
-  description: "name", label: "name",
-  portfolio: "portfolio", broker: "portfolio", account: "portfolio", platform: "portfolio",
-  date: "transaction_date", "trade date": "transaction_date",
-  "transaction date": "transaction_date", "trade_date": "transaction_date",
-  "transactiondate": "transaction_date",
+  description: "name",
+  label: "name",
+  portfolio: "portfolio",
+  broker: "portfolio",
+  account: "portfolio",
+  platform: "portfolio",
+  date: "transaction_date",
+  "trade date": "transaction_date",
+  "transaction date": "transaction_date",
+  trade_date: "transaction_date",
+  transactiondate: "transaction_date",
 };
 
 export type CsvTransactionRow = {
@@ -84,7 +116,8 @@ export function mapCsvRows(rows: string[][]): {
   const idx = (k: string) => header.indexOf(k);
   const required = ["ticker", "shares", "price"];
   const missing = required.filter((k) => idx(k) === -1);
-  if (missing.length) return { rows: [], errors: [`Missing required column(s): ${missing.join(", ")}`] };
+  if (missing.length)
+    return { rows: [], errors: [`Missing required column(s): ${missing.join(", ")}`] };
 
   const errors: string[] = [];
   const out: CsvTransactionRow[] = [];
@@ -100,11 +133,18 @@ export function mapCsvRows(rows: string[][]): {
     const priceN = Number((get("price") || "0").replace(/,/g, "")) || 0;
     const rawDate = get("transaction_date");
     const date = rawDate ? normalizeDate(rawDate) : today;
-    if (!ticker) { errors.push(`Row ${r + 1}: missing ticker`); continue; }
-    if (!Number.isFinite(sharesN) || sharesN <= 0) {
-      errors.push(`Row ${r + 1}: invalid shares "${get("shares")}"`); continue;
+    if (!ticker) {
+      errors.push(`Row ${r + 1}: missing ticker`);
+      continue;
     }
-    if (!date) { errors.push(`Row ${r + 1}: invalid date "${rawDate}"`); continue; }
+    if (!Number.isFinite(sharesN) || sharesN <= 0) {
+      errors.push(`Row ${r + 1}: invalid shares "${get("shares")}"`);
+      continue;
+    }
+    if (!date) {
+      errors.push(`Row ${r + 1}: invalid date "${rawDate}"`);
+      continue;
+    }
     out.push({
       ticker,
       name: get("name") || undefined,

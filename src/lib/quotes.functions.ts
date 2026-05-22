@@ -1,6 +1,4 @@
-// import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
 
 const QuoteInput = z.object({
   symbols: z.array(z.string().min(1).max(32)).min(1).max(100),
@@ -24,7 +22,23 @@ const QUOTE_CACHE = new Map<string, CachedQ>();
 const TTL_MS = 60_000;
 const STALE_MS = 30 * 60_000;
 
-function normalize(input: string, raw: any): Quote | null {
+type RawQuote = {
+  symbol?: unknown;
+  shortName?: unknown;
+  longName?: unknown;
+  regularMarketPrice?: unknown;
+  regularMarketPreviousClose?: unknown;
+  currency?: unknown;
+  fullExchangeName?: unknown;
+  exchange?: unknown;
+  marketState?: unknown;
+};
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function normalize(input: string, raw: RawQuote | undefined): Quote | null {
   if (!raw) return null;
   const price = Number(raw.regularMarketPrice);
   if (!Number.isFinite(price)) return null;
@@ -38,14 +52,14 @@ function normalize(input: string, raw: any): Quote | null {
   return {
     symbol: String(raw.symbol ?? input).toUpperCase(),
     inputSymbol: input.toUpperCase(),
-    shortName: raw.shortName ?? raw.longName,
+    shortName: optionalString(raw.shortName) ?? optionalString(raw.longName),
     regularMarketPrice: p,
     regularMarketPreviousClose: pp,
     regularMarketChange: change,
     regularMarketChangePercent: pp ? (change / pp) * 100 : 0,
     currency: isPence ? "GBP" : rawCur,
-    exchange: raw.fullExchangeName ?? raw.exchange,
-    marketState: raw.marketState,
+    exchange: optionalString(raw.fullExchangeName) ?? optionalString(raw.exchange),
+    marketState: optionalString(raw.marketState),
   };
 }
 
@@ -58,11 +72,11 @@ async function fetchYahooQuotes(symbols: string[]): Promise<Quote[]> {
   }
 
   const json = (await response.json()) as {
-    quotes?: any[];
+    quotes?: RawQuote[];
   };
   const rows = json.quotes ?? [];
 
-  const bySymbol = new Map<string, any>();
+  const bySymbol = new Map<string, RawQuote>();
   for (const row of rows) {
     const symbol = String(row?.symbol ?? "").toUpperCase();
     if (symbol) bySymbol.set(symbol, row);
@@ -130,27 +144,6 @@ export async function getQuotesClient(symbols: string[]): Promise<{ quotes: Quot
   }
 
   return {
-    quotes: unique
-      .map((symbol) => quoteBySymbol.get(symbol))
-      .filter((q): q is Quote => Boolean(q)),
+    quotes: unique.map((symbol) => quoteBySymbol.get(symbol)).filter((q): q is Quote => Boolean(q)),
   };
-}
-
-// ===== FX rates via Frankfurter (ECB, free, no key) =====
-const FxInput = z.object({
-  currencies: z.array(z.string().min(3).max(5)).max(20),
-});
-
-type FxCache = { rates: Record<string, number>; ts: number };
-let FX_CACHE: FxCache | null = null;
-const FX_TTL_MS = 10 * 60_000;
-const FX_STALE_MS = 24 * 60 * 60_000;
-
-// getFxRates: Implement client-side fetching using a public API as needed for static hosting.
-
-function pickRates(all: Record<string, number>, wanted: string[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const c of wanted) if (all[c]) out[c] = all[c];
-  if (!out.USD) out.USD = 1;
-  return out;
 }

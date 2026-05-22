@@ -8,7 +8,19 @@ import { type PortfolioInputType } from "@/lib/portfolios.functions";
 import { type TransactionInputType } from "@/lib/positions.functions";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
-const MARKETS = ["NASDAQ", "NYSE", "LSE", "EPA", "ETR", "TSX", "ASX", "HKEX", "TSE", "CRYPTO", "OTHER"];
+const MARKETS = [
+  "NASDAQ",
+  "NYSE",
+  "LSE",
+  "EPA",
+  "ETR",
+  "TSX",
+  "ASX",
+  "HKEX",
+  "TSE",
+  "CRYPTO",
+  "OTHER",
+];
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -96,15 +108,13 @@ function TransactionsPage() {
 
   const portfolioName = useMemo(() => {
     const map = new Map(portfolios.map((p) => [p.id, p.name]));
-    return (id: string | null) => (id ? map.get(id) ?? "-" : "Unassigned");
+    return (id: string | null) => (id ? (map.get(id) ?? "-") : "Unassigned");
   }, [portfolios]);
 
   const createM = useMutation({
     mutationFn: async (value: TransactionInputType) => {
       const userId = await getCurrentUserId();
-      const { error } = await supabase
-        .from("transactions")
-        .insert([{ ...value, user_id: userId }]);
+      const { error } = await supabase.from("transactions").insert([{ ...value, user_id: userId }]);
 
       if (error) throw new Error(error.message);
     },
@@ -119,10 +129,7 @@ function TransactionsPage() {
   const updateM = useMutation({
     mutationFn: async (value: TransactionInputType & { id: string }) => {
       const { id, ...rest } = value;
-      const { error } = await supabase
-        .from("transactions")
-        .update(rest)
-        .eq("id", id);
+      const { error } = await supabase.from("transactions").update(rest).eq("id", id);
 
       if (error) throw new Error(error.message);
     },
@@ -163,9 +170,7 @@ function TransactionsPage() {
   const createP = useMutation({
     mutationFn: async (value: PortfolioInputType) => {
       const userId = await getCurrentUserId();
-      const { error } = await supabase
-        .from("portfolios")
-        .insert([{ ...value, user_id: userId }]);
+      const { error } = await supabase.from("portfolios").insert([{ ...value, user_id: userId }]);
 
       if (error) throw new Error(error.message);
     },
@@ -217,9 +222,7 @@ function TransactionsPage() {
       // Ensure portfolios from CSV exist so each row can map to its intended portfolio.
       const csvPortfolioNames = Array.from(
         new Set(
-          rows
-            .map((row) => row.portfolio?.trim())
-            .filter((name): name is string => Boolean(name)),
+          rows.map((row) => row.portfolio?.trim()).filter((name): name is string => Boolean(name)),
         ),
       );
 
@@ -246,7 +249,7 @@ function TransactionsPage() {
       const payload = rows.map((row) => {
         const portfolioName = row.portfolio?.trim();
         const portfolioId = portfolioName
-          ? portfolioIdByName.get(portfolioName.toLowerCase()) ?? null
+          ? (portfolioIdByName.get(portfolioName.toLowerCase()) ?? null)
           : null;
 
         return {
@@ -332,14 +335,14 @@ function TransactionsPage() {
             <strong className="text-foreground">Required columns:</strong> ticker, shares, price.
           </p>
           <p>
-            <strong className="text-foreground">Optional:</strong> transaction_date, portfolio, asset_type, market,
-            currency, notes.
+            <strong className="text-foreground">Optional:</strong> transaction_date, portfolio,
+            asset_type, market, currency, notes.
           </p>
           <p>
             <strong className="text-foreground">Tickers:</strong> AAPL, AIR.PA, VOD.L, BTC-USD.
           </p>
           <pre className="mt-2 overflow-x-auto border border-border bg-background p-2">
-{`transaction_date,ticker,asset_type,currency,shares,price,portfolio
+            {`transaction_date,ticker,asset_type,currency,shares,price,portfolio
 2024-01-15,AAPL,stock,USD,10,150.20,IBKR
 2024-06-03,AAPL,stock,USD,5,185.40,IBKR
 2024-03-10,AIR.PA,stock,EUR,5,128.40,Degiro
@@ -350,7 +353,9 @@ function TransactionsPage() {
 
       {selected.size > 0 && (
         <div className="flex items-center gap-3 border border-bear/30 bg-bear/5 px-3 py-2 text-[11px]">
-          <span className="font-bold uppercase tracking-widest text-bear">{selected.size} selected</span>
+          <span className="font-bold uppercase tracking-widest text-bear">
+            {selected.size} selected
+          </span>
           <button
             onClick={() => {
               if (confirm(`Delete ${selected.size} transactions?`)) {
@@ -435,7 +440,9 @@ function TransactionsPage() {
                 <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
                 <td className="px-3 py-2 text-[11px]">{position.market || "-"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{Number(position.price).toFixed(2)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {Number(position.price).toFixed(2)}
+                </td>
                 <td className="px-3 py-2 text-[11px]">{position.currency}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button
@@ -460,7 +467,11 @@ function TransactionsPage() {
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm(`Delete transaction for ${position.ticker} on ${position.transaction_date}?`)) {
+                      if (
+                        confirm(
+                          `Delete transaction for ${position.ticker} on ${position.transaction_date}?`,
+                        )
+                      ) {
                         deleteM.mutate(position.id);
                       }
                     }}
@@ -569,7 +580,9 @@ function EditModal({
           <Field label="Type">
             <select
               value={v.asset_type}
-              onChange={(e) => set("asset_type", e.target.value as TransactionInputType["asset_type"])}
+              onChange={(e) =>
+                set("asset_type", e.target.value as TransactionInputType["asset_type"])
+              }
               className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             >
               {ASSET_TYPES.map((type) => (
@@ -753,7 +766,9 @@ function PortfoliosModal({
 
           <div className="border border-border">
             {portfolios.length === 0 && (
-              <div className="p-3 text-center text-[11px] text-muted-foreground">No portfolios yet</div>
+              <div className="p-3 text-center text-[11px] text-muted-foreground">
+                No portfolios yet
+              </div>
             )}
             {portfolios.map((p) => (
               <div
@@ -767,7 +782,9 @@ function PortfoliosModal({
                 </div>
                 <button
                   onClick={() => {
-                    if (confirm(`Delete portfolio \"${p.name}\"? Transactions will become unassigned.`)) {
+                    if (
+                      confirm(`Delete portfolio "${p.name}"? Transactions will become unassigned.`)
+                    ) {
                       onDelete(p.id);
                     }
                   }}
@@ -795,7 +812,9 @@ function Field({
 }) {
   return (
     <label className={`block ${colSpan === 2 ? "col-span-2" : ""}`}>
-      <div className="mb-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{label}</div>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        {label}
+      </div>
       {children}
     </label>
   );

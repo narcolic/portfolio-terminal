@@ -22,7 +22,7 @@ function LoginPage() {
     setBusy(true);
     try {
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-        toast.error('Supabase not configured locally');
+        toast.error("Supabase not configured locally");
         return;
       }
       if (mode === "signup") {
@@ -48,14 +48,14 @@ function LoginPage() {
     setBusy(true);
     try {
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-        toast.error('Supabase not configured locally');
+        toast.error("Supabase not configured locally");
         setBusy(false);
         return;
       }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin },
-      } as any);
+      });
       if (error) throw error;
       // The provider will redirect the browser for OAuth; nothing further needed here.
     } catch (err) {
@@ -67,7 +67,9 @@ function LoginPage() {
   if (loading) {
     return (
       <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
-        <div className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Loading authentication…</div>
+        <div className="text-sm uppercase tracking-[0.25em] text-muted-foreground">
+          Loading authentication…
+        </div>
       </div>
     );
   }
@@ -76,9 +78,14 @@ function LoginPage() {
     return (
       <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
         <div className="relative w-full max-w-md border border-border bg-card p-6">
-          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">AUTHENTICATED</div>
+          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+            AUTHENTICATED
+          </div>
           <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
-          <p className="mt-3 text-sm text-muted-foreground">You are signed in as <span className="font-semibold text-primary">{user.email ?? user.id}</span>.</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            You are signed in as{" "}
+            <span className="font-semibold text-primary">{user.email ?? user.id}</span>.
+          </p>
           <div className="mt-6 space-y-3">
             <button
               type="button"
@@ -92,7 +99,12 @@ function LoginPage() {
             >
               &gt; SIGN OUT
             </button>
-            <a href="/" className="block text-center text-[10px] uppercase tracking-[0.25em] text-primary hover:underline">&lt; back to login</a>
+            <a
+              href="/"
+              className="block text-center text-[10px] uppercase tracking-[0.25em] text-primary hover:underline"
+            >
+              &lt; back to login
+            </a>
           </div>
         </div>
       </div>
@@ -171,7 +183,9 @@ function LoginPage() {
         </div>
 
         <div className="mt-4 text-[10px] text-muted-foreground text-center">
-          <a href="/" className="hover:text-primary">&lt; back</a>
+          <a href="/" className="hover:text-primary">
+            &lt; back
+          </a>
         </div>
       </div>
     </div>

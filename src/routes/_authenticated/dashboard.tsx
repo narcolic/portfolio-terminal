@@ -3,12 +3,25 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  aggregateTransactions, enrich, fmt, fmtCurrency, fmtPct,
-  type Enriched, type TransactionRow,
+  aggregateTransactions,
+  enrich,
+  fmt,
+  fmtCurrency,
+  fmtPct,
+  type Enriched,
+  type TransactionRow,
 } from "@/lib/portfolio";
 import { getQuotesClient } from "@/lib/quotes.functions";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
 } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -138,7 +151,7 @@ function Dashboard() {
   });
 
   // rates[X] = USD per 1 X
-  const rates: Record<string, number> = fxQ.data?.rates ?? { USD: 1 };
+  const rates = useMemo<Record<string, number>>(() => fxQ.data?.rates ?? { USD: 1 }, [fxQ.data]);
 
   const convert = useMemo(() => {
     const dispRate = rates[display] ?? 1; // USD per 1 display unit
@@ -152,10 +165,11 @@ function Dashboard() {
   }, [rates, display]);
 
   const convRows = useMemo(
-    () => allRows.map((r) => ({
-      ...r,
-      _nativeCurrency: (r.quote?.currency ?? r.currency ?? "USD").toUpperCase(),
-    })),
+    () =>
+      allRows.map((r) => ({
+        ...r,
+        _nativeCurrency: (r.quote?.currency ?? r.currency ?? "USD").toUpperCase(),
+      })),
     [allRows],
   );
 
@@ -179,6 +193,7 @@ function Dashboard() {
 
   useEffect(() => {
     if (!displayCurrencies.includes(display)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplay(displayCurrencies[0] ?? "USD");
     }
   }, [display, displayCurrencies]);
@@ -202,7 +217,7 @@ function Dashboard() {
       const t = computeTotals(items, convert);
       return {
         id,
-        name: id === UNASSIGNED ? "Unassigned" : portfolioMap.get(id) ?? "—",
+        name: id === UNASSIGNED ? "Unassigned" : (portfolioMap.get(id) ?? "—"),
         count: items.length,
         ...t,
       };
@@ -266,7 +281,9 @@ function Dashboard() {
               key={c}
               onClick={() => setDisplay(c)}
               className={`px-4 text-[11px] uppercase tracking-[0.2em] border-r border-border last:border-r-0 ${
-                display === c ? "bg-primary text-primary-foreground font-bold" : "hover:text-primary"
+                display === c
+                  ? "bg-primary text-primary-foreground font-bold"
+                  : "hover:text-primary"
               }`}
             >
               {c}
@@ -277,7 +294,11 @@ function Dashboard() {
 
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label={selected === ALL ? `NET WORTH (${display})` : `PORTFOLIO VALUE (${display})`} value={dispFmt(totals.mv)} accent />
+        <Stat
+          label={selected === ALL ? `NET WORTH (${display})` : `PORTFOLIO VALUE (${display})`}
+          value={dispFmt(totals.mv)}
+          accent
+        />
         <Stat
           label="DAY P&L"
           value={dispFmt(totals.dayChange)}
@@ -368,7 +389,9 @@ type ConvFn = (amt: number, from: string) => number;
 type RowWithNative = Enriched & { _nativeCurrency: string };
 
 function computeTotals(rows: RowWithNative[], convert: ConvFn) {
-  let mv = 0, cost = 0, dayChange = 0;
+  let mv = 0,
+    cost = 0,
+    dayChange = 0;
   for (const r of rows) {
     const cur = r._nativeCurrency;
     mv += convert(r.marketValue, cur);
@@ -377,7 +400,10 @@ function computeTotals(rows: RowWithNative[], convert: ConvFn) {
   }
   const unrealized = mv - cost;
   return {
-    mv, cost, dayChange, unrealized,
+    mv,
+    cost,
+    dayChange,
+    unrealized,
     dayPct: mv - dayChange ? (dayChange / (mv - dayChange)) * 100 : 0,
     unrealizedPct: cost ? (unrealized / cost) * 100 : 0,
   };
@@ -411,8 +437,18 @@ const COLORS = [
 ];
 
 function Breakdown({
-  data, total, chart, display, formatter,
-}: { data: { name: string; value: number }[]; total: number; chart: "pie" | "bar"; display: Display; formatter?: (value: number, name: string) => string }) {
+  data,
+  total,
+  chart,
+  display,
+  formatter,
+}: {
+  data: { name: string; value: number }[];
+  total: number;
+  chart: "pie" | "bar";
+  display: Display;
+  formatter?: (value: number, name: string) => string;
+}) {
   if (data.length === 0) return <div className="text-muted-foreground text-xs">No data</div>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
@@ -420,11 +456,23 @@ function Breakdown({
         <ResponsiveContainer>
           {chart === "pie" ? (
             <PieChart>
-              <Pie data={data} dataKey="value" innerRadius={45} outerRadius={80} stroke="var(--color-background)">
-                {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <Pie
+                data={data}
+                dataKey="value"
+                innerRadius={45}
+                outerRadius={80}
+                stroke="var(--color-background)"
+              >
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
               </Pie>
               <Tooltip
-                contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                contentStyle={{
+                  background: "var(--color-card)",
+                  border: "1px solid var(--color-border)",
+                  fontSize: 11,
+                }}
                 wrapperStyle={{ color: "var(--color-foreground)" }}
                 labelStyle={{ color: "var(--color-foreground)" }}
                 itemStyle={{ color: "var(--color-foreground)" }}
@@ -433,10 +481,17 @@ function Breakdown({
             </PieChart>
           ) : (
             <BarChart data={data}>
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }}
+              />
               <YAxis tick={{ fontSize: 10, fill: "var(--color-muted-foreground)" }} />
               <Tooltip
-                contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", fontSize: 11 }}
+                contentStyle={{
+                  background: "var(--color-card)",
+                  border: "1px solid var(--color-border)",
+                  fontSize: 11,
+                }}
                 wrapperStyle={{ color: "var(--color-foreground)" }}
                 labelStyle={{ color: "var(--color-foreground)" }}
                 itemStyle={{ color: "var(--color-foreground)" }}
@@ -451,7 +506,10 @@ function Breakdown({
         {data.map((d, i) => {
           const pct = total ? (d.value / total) * 100 : 0;
           return (
-            <div key={d.name} className="flex items-center justify-between border-b border-border/40 py-1">
+            <div
+              key={d.name}
+              className="flex items-center justify-between border-b border-border/40 py-1"
+            >
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="uppercase text-[11px]">{d.name}</span>
@@ -469,16 +527,32 @@ function Breakdown({
 }
 
 function Stat({
-  label, value, sub, tone, accent,
-}: { label: string; value: string; sub?: string; tone?: "bull" | "bear"; accent?: boolean }) {
+  label,
+  value,
+  sub,
+  tone,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "bull" | "bear";
+  accent?: boolean;
+}) {
   return (
-    <div className={`border border-border bg-card px-4 py-3 ${accent ? "border-l-2 border-l-primary" : ""}`}>
+    <div
+      className={`border border-border bg-card px-4 py-3 ${accent ? "border-l-2 border-l-primary" : ""}`}
+    >
       <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-foreground"}`}>
+      <div
+        className={`mt-1 text-2xl font-bold ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-foreground"}`}
+      >
         {value}
       </div>
       {sub && (
-        <div className={`text-[11px] ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-muted-foreground"}`}>
+        <div
+          className={`text-[11px] ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-muted-foreground"}`}
+        >
           {sub}
         </div>
       )}
@@ -486,7 +560,15 @@ function Stat({
   );
 }
 
-function Panel({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
+function Panel({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
@@ -503,7 +585,9 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
 }
 function Td({ children, tone }: { children: React.ReactNode; tone?: "bull" | "bear" }) {
   return (
-    <td className={`px-2 py-2 text-right tabular-nums ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : ""}`}>
+    <td
+      className={`px-2 py-2 text-right tabular-nums ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : ""}`}
+    >
       {children}
     </td>
   );
@@ -524,7 +608,9 @@ function EmptyState() {
     <div className="border border-dashed border-border p-12 text-center">
       <div className="text-[10px] uppercase tracking-[0.3em] text-primary">// NO TRANSACTIONS</div>
       <h2 className="mt-3 text-2xl">Your portfolio is empty</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Add your first transaction to start tracking live values.</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Add your first transaction to start tracking live values.
+      </p>
       <Link
         to="/positions"
         className="inline-block mt-6 bg-primary text-primary-foreground px-6 py-2 text-xs uppercase tracking-[0.25em] font-bold hover:opacity-90"

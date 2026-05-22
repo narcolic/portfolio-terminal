@@ -1,2 +1,2 @@
-import { startInstance } from './start'
-export { startInstance }
+import { startInstance } from "./start";
+export { startInstance };

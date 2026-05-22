@@ -1,10 +1,5 @@
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-} from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +36,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <div className="mt-6 flex justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="border border-primary px-4 py-2 text-xs uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           >
             &gt; retry
@@ -61,9 +59,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Live portfolio dashboard with real-time market data" },
       { property: "og:title", content: "TERMINAL // Portfolio" },
       { name: "twitter:title", content: "TERMINAL // Portfolio" },
-      { property: "og:description", content: "Live portfolio dashboard with real-time market data" },
-      { name: "twitter:description", content: "Live portfolio dashboard with real-time market data" },
-      
+      {
+        property: "og:description",
+        content: "Live portfolio dashboard with real-time market data",
+      },
+      {
+        name: "twitter:description",
+        content: "Live portfolio dashboard with real-time market data",
+      },
+
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -100,7 +104,18 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthBridge />
       <Outlet />
-      <Toaster theme="dark" position="top-right" toastOptions={{ style: { background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)", fontFamily: "var(--font-mono)" } }} />
+      <Toaster
+        theme="dark"
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "var(--color-card)",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-foreground)",
+            fontFamily: "var(--font-mono)",
+          },
+        }}
+      />
     </QueryClientProvider>
   );
 }

@@ -1,2 +1,2 @@
-export const hasPluginAdapters = false
-export const pluginSerializationAdapters = []
+export const hasPluginAdapters = false;
+export const pluginSerializationAdapters = [];

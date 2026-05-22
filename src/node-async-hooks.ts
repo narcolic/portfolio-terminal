@@ -1,11 +1,11 @@
-export class AsyncLocalStorage<T = any> {
+export class AsyncLocalStorage<T = unknown> {
   private store: T | undefined;
 
   getStore() {
     return this.store;
   }
 
-  run(store: T, callback: (...args: any[]) => any, ...args: any[]) {
+  run<R, Args extends unknown[]>(store: T, callback: (...args: Args) => R, ...args: Args): R {
     const previous = this.store;
     this.store = store;
     try {
