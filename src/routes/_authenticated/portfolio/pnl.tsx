@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getQuotesClient } from "@/lib/quotes.functions";
+import { TerminalCard } from "@/components/terminal/TerminalCard";
+import { TerminalTable } from "@/components/terminal/TerminalTable";
+import { getQuotesClient } from "@/lib/portfolio/quotes.functions";
 import {
   aggregateTransactions,
   enrich,
@@ -10,9 +12,9 @@ import {
   fmtCurrency,
   fmtPct,
   type TransactionRow,
-} from "@/lib/portfolio";
+} from "@/lib/portfolio/portfolio";
 
-export const Route = createFileRoute("/_authenticated/pnl")({
+export const Route = createFileRoute("/_authenticated/portfolio/pnl")({
   component: PnL,
 });
 
@@ -86,25 +88,22 @@ function Bucket({
   rows: ReturnType<typeof enrich>;
 }) {
   return (
-    <section className="border border-border bg-card">
-      <div
-        className={`border-b border-border px-3 py-2 flex justify-between items-center ${tone === "bull" ? "bg-bull/10" : "bg-bear/10"}`}
-      >
-        <h2
-          className={`text-[11px] uppercase tracking-[0.3em] ${tone === "bull" ? "text-bull" : "text-bear"}`}
-        >
-          &gt; {title} ({rows.length})
-        </h2>
+    <TerminalCard
+      title={`${title} (${rows.length})`}
+      bodyClassName="p-0"
+      actions={
         <span
           className={`text-sm font-bold tabular-nums ${tone === "bull" ? "text-bull" : "text-bear"}`}
         >
           {fmtCurrency(total)}
         </span>
-      </div>
+      }
+    >
+      <div className={`h-1 ${tone === "bull" ? "bg-bull/40" : "bg-bear/40"}`} />
       {rows.length === 0 ? (
         <div className="p-6 text-center text-xs text-muted-foreground">Nothing here. Good.</div>
       ) : (
-        <table className="w-full text-[12px]">
+        <TerminalTable>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-border/60">
@@ -126,8 +125,8 @@ function Bucket({
               </tr>
             ))}
           </tbody>
-        </table>
+        </TerminalTable>
       )}
-    </section>
+    </TerminalCard>
   );
 }

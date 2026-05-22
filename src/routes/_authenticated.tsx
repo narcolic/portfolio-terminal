@@ -35,9 +35,9 @@ function AuthLayout() {
           <div className="flex items-center gap-6">
             <div className="font-bold text-primary">▰ PORTFOLIO TERMINAL</div>
             <nav className="hidden md:flex items-center gap-1">
-              <NavLink to="/dashboard">Dashboard</NavLink>
-              <NavLink to="/positions">Transactions</NavLink>
-              <NavLink to="/pnl">P&amp;L</NavLink>
+              <NavLink to="/portfolio">Dashboard</NavLink>
+              <NavLink to="/portfolio/positions">Transactions</NavLink>
+              <NavLink to="/portfolio/pnl">P&amp;L</NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
@@ -58,9 +58,9 @@ function AuthLayout() {
           </div>
         </div>
         <nav className="md:hidden flex border-t border-border text-[11px] uppercase tracking-[0.2em]">
-          <NavLink to="/dashboard">Dash</NavLink>
-          <NavLink to="/positions">Tx</NavLink>
-          <NavLink to="/pnl">P&amp;L</NavLink>
+          <NavLink to="/portfolio">Dash</NavLink>
+          <NavLink to="/portfolio/positions">Tx</NavLink>
+          <NavLink to="/portfolio/pnl">P&amp;L</NavLink>
         </nav>
       </header>
       <main className="p-4 md:p-6 max-w-[1400px] mx-auto">
@@ -74,6 +74,7 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link
       to={to}
+      activeOptions={{ exact: true }}
       className="px-3 py-1 hover:text-primary"
       activeProps={{ className: "px-3 py-1 text-primary border-b-2 border-primary" }}
     >

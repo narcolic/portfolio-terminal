@@ -2,6 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { TerminalCard } from "@/components/terminal/TerminalCard";
+import { StatCard } from "@/components/terminal/StatCard";
+import { TerminalTable, TerminalTd, TerminalTh } from "@/components/terminal/TerminalTable";
 import {
   aggregateTransactions,
   enrich,
@@ -10,8 +13,8 @@ import {
   fmtPct,
   type Enriched,
   type TransactionRow,
-} from "@/lib/portfolio";
-import { getQuotesClient } from "@/lib/quotes.functions";
+} from "@/lib/portfolio/portfolio";
+import { getQuotesClient } from "@/lib/portfolio/quotes.functions";
 import {
   PieChart,
   Pie,
@@ -24,7 +27,7 @@ import {
   YAxis,
 } from "recharts";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
+export const Route = createFileRoute("/_authenticated/portfolio/")({
   component: Dashboard,
 });
 
@@ -294,34 +297,34 @@ function Dashboard() {
 
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat
+        <StatCard
           label={selected === ALL ? `NET WORTH (${display})` : `PORTFOLIO VALUE (${display})`}
           value={dispFmt(totals.mv)}
           accent
         />
-        <Stat
+        <StatCard
           label="DAY P&L"
           value={dispFmt(totals.dayChange)}
           sub={fmtPct(totals.dayPct)}
           tone={totals.dayChange >= 0 ? "bull" : "bear"}
         />
-        <Stat
+        <StatCard
           label="UNREALIZED"
           value={dispFmt(totals.unrealized)}
           sub={fmtPct(totals.unrealizedPct)}
           tone={totals.unrealized >= 0 ? "bull" : "bear"}
         />
-        <Stat label="COST BASIS" value={dispFmt(totals.cost)} />
+        <StatCard label="COST BASIS" value={dispFmt(totals.cost)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Panel title="ALLOCATION // BY TYPE">
+        <TerminalCard title="ALLOCATION // BY TYPE">
           <Breakdown data={byType} total={totals.mv} chart="pie" display={display} />
-        </Panel>
-        <Panel title="ALLOCATION // BY MARKET">
+        </TerminalCard>
+        <TerminalCard title="ALLOCATION // BY MARKET">
           <Breakdown data={byMarket} total={totals.mv} chart="bar" display={display} />
-        </Panel>
-        <Panel title="ALLOCATION // BY CURRENCY">
+        </TerminalCard>
+        <TerminalCard title="ALLOCATION // BY CURRENCY">
           <Breakdown
             data={byCurrency}
             total={byCurrency.reduce((sum, item) => sum + item.value, 0)}
@@ -329,28 +332,28 @@ function Dashboard() {
             display={display}
             formatter={(value, currency) => fmtCurrency(value, currency)}
           />
-        </Panel>
+        </TerminalCard>
       </div>
 
-      <Panel
+      <TerminalCard
         title="HOLDINGS"
         actions={
           <span className="text-[10px] text-muted-foreground">{`${rows.length} positions · ${display}`}</span>
         }
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <TerminalTable>
             <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
               <tr className="border-b border-border">
-                <Th className="text-left">Ticker</Th>
-                <Th className="text-right">Shares</Th>
-                <Th className="text-right">Price (native)</Th>
-                <Th className="text-right">Day %</Th>
-                <Th className="text-right">Mkt Value ({display})</Th>
-                <Th className="text-right">Avg Cost</Th>
-                <Th className="text-right">Tx</Th>
-                <Th className="text-right">Unrealized ({display})</Th>
-                <Th className="text-right">P&L %</Th>
+                <TerminalTh className="text-left">Ticker</TerminalTh>
+                <TerminalTh className="text-right">Shares</TerminalTh>
+                <TerminalTh className="text-right">Price (native)</TerminalTh>
+                <TerminalTh className="text-right">Day %</TerminalTh>
+                <TerminalTh className="text-right">Mkt Value ({display})</TerminalTh>
+                <TerminalTh className="text-right">Avg Cost</TerminalTh>
+                <TerminalTh className="text-right">Tx</TerminalTh>
+                <TerminalTh className="text-right">Unrealized ({display})</TerminalTh>
+                <TerminalTh className="text-right">P&L %</TerminalTh>
               </tr>
             </thead>
             <tbody>
@@ -366,21 +369,27 @@ function Dashboard() {
                         {r.quote?.shortName || r.name || r.asset_type} · {native}
                       </div>
                     </td>
-                    <Td>{fmt(r.shares, { maximumFractionDigits: 4 })}</Td>
-                    <Td>{fmtCurrency(r.price, native)}</Td>
-                    <Td tone={r.dayChangePct >= 0 ? "bull" : "bear"}>{fmtPct(r.dayChangePct)}</Td>
-                    <Td>{dispFmt(mvDisp)}</Td>
-                    <Td>{fmt(r.avg_cost)}</Td>
-                    <Td>{r.tx_count}</Td>
-                    <Td tone={r.unrealized >= 0 ? "bull" : "bear"}>{dispFmt(unrealDisp)}</Td>
-                    <Td tone={r.unrealizedPct >= 0 ? "bull" : "bear"}>{fmtPct(r.unrealizedPct)}</Td>
+                    <TerminalTd>{fmt(r.shares, { maximumFractionDigits: 4 })}</TerminalTd>
+                    <TerminalTd>{fmtCurrency(r.price, native)}</TerminalTd>
+                    <TerminalTd tone={r.dayChangePct >= 0 ? "bull" : "bear"}>
+                      {fmtPct(r.dayChangePct)}
+                    </TerminalTd>
+                    <TerminalTd>{dispFmt(mvDisp)}</TerminalTd>
+                    <TerminalTd>{fmt(r.avg_cost)}</TerminalTd>
+                    <TerminalTd>{r.tx_count}</TerminalTd>
+                    <TerminalTd tone={r.unrealized >= 0 ? "bull" : "bear"}>
+                      {dispFmt(unrealDisp)}
+                    </TerminalTd>
+                    <TerminalTd tone={r.unrealizedPct >= 0 ? "bull" : "bear"}>
+                      {fmtPct(r.unrealizedPct)}
+                    </TerminalTd>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
+          </TerminalTable>
         </div>
-      </Panel>
+      </TerminalCard>
     </div>
   );
 }
@@ -526,73 +535,6 @@ function Breakdown({
   );
 }
 
-function Stat({
-  label,
-  value,
-  sub,
-  tone,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "bull" | "bear";
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`border border-border bg-card px-4 py-3 ${accent ? "border-l-2 border-l-primary" : ""}`}
-    >
-      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{label}</div>
-      <div
-        className={`mt-1 text-2xl font-bold ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-foreground"}`}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div
-          className={`text-[11px] ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : "text-muted-foreground"}`}
-        >
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  actions,
-  children,
-}: {
-  title: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border bg-secondary/40 px-3 py-2">
-        <h2 className="text-[10px] uppercase tracking-[0.3em] text-primary">&gt; {title}</h2>
-        {actions}
-      </div>
-      <div className="p-3 md:p-4">{children}</div>
-    </section>
-  );
-}
-
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <th className={`px-2 py-2 font-normal ${className}`}>{children}</th>;
-}
-function Td({ children, tone }: { children: React.ReactNode; tone?: "bull" | "bear" }) {
-  return (
-    <td
-      className={`px-2 py-2 text-right tabular-nums ${tone === "bull" ? "text-bull" : tone === "bear" ? "text-bear" : ""}`}
-    >
-      {children}
-    </td>
-  );
-}
-
 function Skeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -612,7 +554,7 @@ function EmptyState() {
         Add your first transaction to start tracking live values.
       </p>
       <Link
-        to="/positions"
+        to="/portfolio/positions"
         className="inline-block mt-6 bg-primary text-primary-foreground px-6 py-2 text-xs uppercase tracking-[0.25em] font-bold hover:opacity-90"
       >
         &gt; ADD TRANSACTION

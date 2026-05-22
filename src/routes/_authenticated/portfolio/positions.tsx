@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { TerminalTable } from "@/components/terminal/TerminalTable";
 import { mapCsvRows, parseCSV } from "@/lib/csv";
-import { type PortfolioInputType } from "@/lib/portfolios.functions";
-import { type TransactionInputType } from "@/lib/positions.functions";
+import { type PortfolioInputType } from "@/lib/portfolio/portfolios.functions";
+import { type TransactionInputType } from "@/lib/portfolio/positions.functions";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
 const MARKETS = [
@@ -376,115 +377,113 @@ function TransactionsPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto border border-border bg-card">
-        <table className="w-full text-[12px]">
-          <thead className="bg-secondary/40 text-[10px] uppercase tracking-widest text-muted-foreground">
+      <TerminalTable variant="panel">
+        <thead className="bg-secondary/40 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <tr>
+            <th className="px-2 py-2 text-center">
+              <input
+                type="checkbox"
+                checked={data.length > 0 && selected.size === data.length}
+                onChange={(e) => {
+                  if (e.target.checked) setSelected(new Set(data.map((p) => p.id)));
+                  else setSelected(new Set());
+                }}
+                className="accent-primary"
+              />
+            </th>
+            <th className="px-3 py-2 text-left">Date</th>
+            <th className="px-3 py-2 text-left">Ticker</th>
+            <th className="px-3 py-2 text-left">Portfolio</th>
+            <th className="px-3 py-2 text-left">Type</th>
+            <th className="px-3 py-2 text-left">Market</th>
+            <th className="px-3 py-2 text-right">Shares</th>
+            <th className="px-3 py-2 text-right">Price</th>
+            <th className="px-3 py-2 text-right">Ccy</th>
+            <th className="px-3 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {isLoading && (
             <tr>
-              <th className="px-2 py-2 text-center">
+              <td colSpan={10} className="p-6 text-center text-muted-foreground">
+                Loading...
+              </td>
+            </tr>
+          )}
+          {!isLoading && data.length === 0 && (
+            <tr>
+              <td colSpan={10} className="p-6 text-center text-muted-foreground">
+                No transactions yet
+              </td>
+            </tr>
+          )}
+          {data.map((position) => (
+            <tr key={position.id} className="border-t border-border/60 hover:bg-secondary/30">
+              <td className="px-2 py-2 text-center">
                 <input
                   type="checkbox"
-                  checked={data.length > 0 && selected.size === data.length}
+                  checked={selected.has(position.id)}
                   onChange={(e) => {
-                    if (e.target.checked) setSelected(new Set(data.map((p) => p.id)));
-                    else setSelected(new Set());
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(position.id);
+                      else next.delete(position.id);
+                      return next;
+                    });
                   }}
                   className="accent-primary"
                 />
-              </th>
-              <th className="px-3 py-2 text-left">Date</th>
-              <th className="px-3 py-2 text-left">Ticker</th>
-              <th className="px-3 py-2 text-left">Portfolio</th>
-              <th className="px-3 py-2 text-left">Type</th>
-              <th className="px-3 py-2 text-left">Market</th>
-              <th className="px-3 py-2 text-right">Shares</th>
-              <th className="px-3 py-2 text-right">Price</th>
-              <th className="px-3 py-2 text-right">Ccy</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={10} className="p-6 text-center text-muted-foreground">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {!isLoading && data.length === 0 && (
-              <tr>
-                <td colSpan={10} className="p-6 text-center text-muted-foreground">
-                  No transactions yet
-                </td>
-              </tr>
-            )}
-            {data.map((position) => (
-              <tr key={position.id} className="border-t border-border/60 hover:bg-secondary/30">
-                <td className="px-2 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(position.id)}
-                    onChange={(e) => {
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        if (e.target.checked) next.add(position.id);
-                        else next.delete(position.id);
-                        return next;
-                      });
-                    }}
-                    className="accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-2 text-[11px] tabular-nums">{position.transaction_date}</td>
-                <td className="px-3 py-2 font-bold text-primary">{position.ticker}</td>
-                <td className="px-3 py-2 text-[11px]">{portfolioName(position.portfolio_id)}</td>
-                <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
-                <td className="px-3 py-2 text-[11px]">{position.market || "-"}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {Number(position.price).toFixed(2)}
-                </td>
-                <td className="px-3 py-2 text-[11px]">{position.currency}</td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
-                  <button
-                    onClick={() =>
-                      setEditing({
-                        id: position.id,
-                        ticker: position.ticker,
-                        name: position.name ?? "",
-                        asset_type: position.asset_type as TransactionInputType["asset_type"],
-                        market: position.market ?? "",
-                        currency: position.currency,
-                        shares: Number(position.shares),
-                        price: Number(position.price),
-                        transaction_date: position.transaction_date,
-                        notes: position.notes ?? "",
-                        portfolio_id: position.portfolio_id ?? null,
-                      })
+              </td>
+              <td className="px-3 py-2 text-[11px] tabular-nums">{position.transaction_date}</td>
+              <td className="px-3 py-2 font-bold text-primary">{position.ticker}</td>
+              <td className="px-3 py-2 text-[11px]">{portfolioName(position.portfolio_id)}</td>
+              <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
+              <td className="px-3 py-2 text-[11px]">{position.market || "-"}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {Number(position.price).toFixed(2)}
+              </td>
+              <td className="px-3 py-2 text-[11px]">{position.currency}</td>
+              <td className="px-3 py-2 text-right whitespace-nowrap">
+                <button
+                  onClick={() =>
+                    setEditing({
+                      id: position.id,
+                      ticker: position.ticker,
+                      name: position.name ?? "",
+                      asset_type: position.asset_type as TransactionInputType["asset_type"],
+                      market: position.market ?? "",
+                      currency: position.currency,
+                      shares: Number(position.shares),
+                      price: Number(position.price),
+                      transaction_date: position.transaction_date,
+                      notes: position.notes ?? "",
+                      portfolio_id: position.portfolio_id ?? null,
+                    })
+                  }
+                  className="mr-3 text-[11px] uppercase text-primary hover:underline"
+                >
+                  edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Delete transaction for ${position.ticker} on ${position.transaction_date}?`,
+                      )
+                    ) {
+                      deleteM.mutate(position.id);
                     }
-                    className="mr-3 text-[11px] uppercase text-primary hover:underline"
-                  >
-                    edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Delete transaction for ${position.ticker} on ${position.transaction_date}?`,
-                        )
-                      ) {
-                        deleteM.mutate(position.id);
-                      }
-                    }}
-                    className="text-[11px] uppercase text-bear hover:underline"
-                  >
-                    del
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  }}
+                  className="text-[11px] uppercase text-bear hover:underline"
+                >
+                  del
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </TerminalTable>
 
       {editing && (
         <EditModal
@@ -820,6 +819,6 @@ function Field({
   );
 }
 
-export const Route = createFileRoute("/_authenticated/positions")({
+export const Route = createFileRoute("/_authenticated/portfolio/positions")({
   component: TransactionsPage,
 });

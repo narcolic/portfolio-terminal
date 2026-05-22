@@ -1,4 +1,4 @@
-import type { Quote } from "@/lib/quotes.functions";
+import type { Quote } from "@/lib/portfolio/quotes.functions";
 
 export type TransactionRow = {
   id: string;
