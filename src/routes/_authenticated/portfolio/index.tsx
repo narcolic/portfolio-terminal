@@ -346,11 +346,11 @@ function Dashboard() {
             <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
               <tr className="border-b border-border">
                 <TerminalTh className="text-left">Ticker</TerminalTh>
-                <TerminalTh className="text-right">Shares</TerminalTh>
-                <TerminalTh className="text-right">Price (native)</TerminalTh>
+                <TerminalTh className="text-right">Quantity</TerminalTh>
+                <TerminalTh className="text-right">Price (Current)</TerminalTh>
+                <TerminalTh className="text-right">Price (Avg)</TerminalTh>
                 <TerminalTh className="text-right">Day %</TerminalTh>
                 <TerminalTh className="text-right">Mkt Value ({display})</TerminalTh>
-                <TerminalTh className="text-right">Avg Cost</TerminalTh>
                 <TerminalTh className="text-right">Tx</TerminalTh>
                 <TerminalTh className="text-right">Unrealized ({display})</TerminalTh>
                 <TerminalTh className="text-right">P&L %</TerminalTh>
@@ -369,13 +369,13 @@ function Dashboard() {
                         {r.quote?.shortName || r.name || r.asset_type} · {native}
                       </div>
                     </td>
-                    <TerminalTd>{fmt(r.shares, { maximumFractionDigits: 4 })}</TerminalTd>
+                    <TerminalTd>{fmt(r.shares, { maximumFractionDigits: 2 })}</TerminalTd>
                     <TerminalTd>{fmtCurrency(r.price, native)}</TerminalTd>
+                    <TerminalTd>{fmtCurrency(r.avg_cost, native)}</TerminalTd>
                     <TerminalTd tone={r.dayChangePct >= 0 ? "bull" : "bear"}>
                       {fmtPct(r.dayChangePct)}
                     </TerminalTd>
                     <TerminalTd>{dispFmt(mvDisp)}</TerminalTd>
-                    <TerminalTd>{fmt(r.avg_cost)}</TerminalTd>
                     <TerminalTd>{r.tx_count}</TerminalTd>
                     <TerminalTd tone={r.unrealized >= 0 ? "bull" : "bear"}>
                       {dispFmt(unrealDisp)}
@@ -506,7 +506,11 @@ function Breakdown({
                 itemStyle={{ color: "var(--color-foreground)" }}
                 formatter={(v: number) => fmtCurrency(v, display)}
               />
-              <Bar dataKey="value" fill="var(--color-primary)" />
+              <Bar dataKey="value">
+                {data.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
             </BarChart>
           )}
         </ResponsiveContainer>
