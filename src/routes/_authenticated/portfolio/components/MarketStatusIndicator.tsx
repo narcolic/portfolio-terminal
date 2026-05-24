@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { useMarketStatus, type MarketSession, type MarketStatusItem } from "@/routes/_authenticated/portfolio/hooks/useMarketStatus";
+import {
+  useMarketStatus,
+  type MarketSession,
+  type MarketStatusItem,
+} from "@/routes/_authenticated/portfolio/hooks/useMarketStatus";
 
 type DotTone = "open" | "amber" | "closed" | "neutral";
 
@@ -102,15 +106,11 @@ function currentWindowHours(m: MarketStatusItem, localTz: string) {
         : m.tradingHours?.regular;
 
   const label =
-    m.session === "PRE_MARKET"
-      ? "Pre-Market"
-      : m.session === "POST_MARKET"
-        ? "After-Hours"
-        : "Regular";
+    m.session === "PRE_MARKET" ? "Pre" : m.session === "POST_MARKET" ? "Post" : "Regular";
 
   const start = convertLocalTime(window?.start, sourceTz, localTz);
   const end = convertLocalTime(window?.end, sourceTz, localTz);
-  return `${label}: ${start} - ${end} ${localTz}`;
+  return `${label}: ${start} - ${end}`;
 }
 
 function byExchange(markets: MarketStatusItem[]) {
@@ -136,7 +136,9 @@ export function MarketStatusIndicator({ exchanges }: { exchanges: string[] }) {
     <div className="inline-flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
       {DISPLAY_ORDER.map((code) => {
         const m = marketMap.get(code);
-        const session: MarketSession = isError ? "UNKNOWN" : (m?.session ?? (isLoading ? "UNKNOWN" : "CLOSED"));
+        const session: MarketSession = isError
+          ? "UNKNOWN"
+          : (m?.session ?? (isLoading ? "UNKNOWN" : "CLOSED"));
         const tone = statusTone(session);
         const pulse = session === "OPEN";
         const marker =
@@ -158,8 +160,10 @@ export function MarketStatusIndicator({ exchanges }: { exchanges: string[] }) {
             <span>{code}</span>
             <span className="text-[9px] text-foreground/80">{marker}</span>
 
-            <div className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden min-w-[260px] border border-border bg-card p-2 text-[10px] uppercase tracking-[0.12em] text-foreground shadow-md group-hover:block">
-              <div className="font-bold text-primary">{code} - {statusLabel}</div>
+            <div className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max max-w-[260px] border border-border bg-card p-2 text-[10px] uppercase tracking-[0.12em] text-foreground shadow-md group-hover:block">
+              <div className="font-bold text-primary">
+                {code} {statusLabel}
+              </div>
               <div className="mt-1 text-muted-foreground">{hoursLine}</div>
             </div>
           </div>

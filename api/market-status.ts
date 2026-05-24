@@ -1,5 +1,5 @@
-const STATUS_URL = "https://markethours.io/api/markets/status";
 const HOURS_URL = "https://markethours.io/api/markets/hours";
+const STATUS_URL = "https://markethours.io/api/markets/status";
 
 type ApiRequest = {
   method?: string;
@@ -108,35 +108,36 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         : {}),
     };
 
-    const [statusResp, hoursResp] = await Promise.all([
-      fetchJson(STATUS_URL, headers),
-      fetchJson(HOURS_URL, headers),
+    const hoursUrl = `${HOURS_URL}?markets=${encodeURIComponent(requested.join(","))}`;
+    const [hoursResp, statusResp] = await Promise.all([
+      fetchJson(hoursUrl, headers),
+      fetchJson(`${STATUS_URL}?markets=${encodeURIComponent(requested.join(","))}`, headers),
     ]);
 
-    if (!statusResp.ok && !hoursResp.ok) {
-      const code = statusResp.status || hoursResp.status || 500;
+    if (!hoursResp.ok && !statusResp.ok) {
+      const code = hoursResp.status || statusResp.status || 500;
       res.status(code).json({ error: `Market API error (${code})` });
       return;
     }
 
-    const statusMarkets = statusResp.ok ? readMarketsPayload(statusResp.json) : [];
     const hoursMarkets = hoursResp.ok ? readMarketsPayload(hoursResp.json) : [];
+    const statusMarkets = statusResp.ok ? readMarketsPayload(statusResp.json) : [];
 
     const byId = new Map<string, AnyObj>();
 
-    for (const m of statusMarkets) {
+    for (const m of hoursMarkets) {
       const id = marketId(m);
       if (!id) continue;
       byId.set(id, {
         id,
         exchange: m.exchange,
         market: m.market,
-        status: pickStatus(m),
         timezone: pickTimezone(m),
+        tradingHours: pickTradingHours(m),
       });
     }
 
-    for (const m of hoursMarkets) {
+    for (const m of statusMarkets) {
       const id = marketId(m);
       if (!id) continue;
       const prev = byId.get(id) ?? { id };
@@ -145,7 +146,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         exchange: prev.exchange ?? m.exchange,
         market: prev.market ?? m.market,
         timezone: prev.timezone ?? pickTimezone(m),
-        tradingHours: pickTradingHours(m),
+        status: pickStatus(m),
       });
     }
 
