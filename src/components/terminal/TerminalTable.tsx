@@ -23,10 +23,15 @@ export function TerminalTable({
 type TerminalThProps = {
   children?: ReactNode;
   className?: string;
+  onClick?: () => void;
 };
 
-export function TerminalTh({ children, className = "" }: TerminalThProps) {
-  return <th className={`px-2 py-2 font-normal ${className}`}>{children}</th>;
+export function TerminalTh({ children, className = "", onClick }: TerminalThProps) {
+  return (
+    <th className={`px-2 py-2 font-normal ${className}`} onClick={onClick}>
+      {children}
+    </th>
+  );
 }
 
 type TerminalTdProps = {

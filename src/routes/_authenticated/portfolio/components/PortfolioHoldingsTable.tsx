@@ -2,8 +2,20 @@ import { TerminalCard } from "@/components/terminal/TerminalCard";
 import { TerminalTable, TerminalTd, TerminalTh } from "@/components/terminal/TerminalTable";
 import { fmt, fmtCurrency, fmtPct } from "@/lib/portfolio/formatters";
 import type { Enriched } from "@/lib/portfolio/types";
+import { useMemo, useState } from "react";
 
 type RowWithNative = Enriched & { _nativeCurrency: string };
+type SortKey =
+  | "ticker"
+  | "shares"
+  | "price"
+  | "avg_cost"
+  | "dayChangePct"
+  | "marketValue"
+  | "tx_count"
+  | "unrealized"
+  | "unrealizedPct";
+type SortDirection = "asc" | "desc";
 
 export function PortfolioHoldingsTable({
   rows,
@@ -16,6 +28,55 @@ export function PortfolioHoldingsTable({
   convert: (amount: number, from: string) => number;
   formatDisplayCurrency: (n: number) => string;
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>("ticker");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const sortedRows = useMemo(() => {
+    const out = rows.slice();
+    out.sort((a, b) => {
+      const dir = sortDirection === "asc" ? 1 : -1;
+      switch (sortKey) {
+        case "ticker":
+          return a.ticker.localeCompare(b.ticker) * dir;
+        case "shares":
+          return (a.shares - b.shares) * dir;
+        case "price":
+          return (a.price - b.price) * dir;
+        case "avg_cost":
+          return (a.avg_cost - b.avg_cost) * dir;
+        case "dayChangePct":
+          return (a.dayChangePct - b.dayChangePct) * dir;
+        case "marketValue": {
+          const av = convert(a.marketValue, a._nativeCurrency);
+          const bv = convert(b.marketValue, b._nativeCurrency);
+          return (av - bv) * dir;
+        }
+        case "tx_count":
+          return (a.tx_count - b.tx_count) * dir;
+        case "unrealized": {
+          const av = convert(a.unrealized, a._nativeCurrency);
+          const bv = convert(b.unrealized, b._nativeCurrency);
+          return (av - bv) * dir;
+        }
+        case "unrealizedPct":
+          return (a.unrealizedPct - b.unrealizedPct) * dir;
+      }
+    });
+    return out;
+  }, [convert, rows, sortDirection, sortKey]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+
+  const sortMark = (key: SortKey) =>
+    sortKey === key ? (sortDirection === "asc" ? " ↑" : " ↓") : "";
+
   return (
     <TerminalCard
       title="HOLDINGS"
@@ -27,19 +88,64 @@ export function PortfolioHoldingsTable({
         <TerminalTable>
           <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
             <tr className="border-b border-border">
-              <TerminalTh className="text-left">Ticker</TerminalTh>
-              <TerminalTh className="text-right">Quantity</TerminalTh>
-              <TerminalTh className="text-right">Price (Current)</TerminalTh>
-              <TerminalTh className="text-right">Price (Avg)</TerminalTh>
-              <TerminalTh className="text-right">Day %</TerminalTh>
-              <TerminalTh className="text-right">Mkt Value ({display})</TerminalTh>
-              <TerminalTh className="text-right">Tx</TerminalTh>
-              <TerminalTh className="text-right">Unrealized ({display})</TerminalTh>
-              <TerminalTh className="text-right">P&L %</TerminalTh>
+              <TerminalTh
+                className="text-left cursor-pointer select-none"
+                onClick={() => toggleSort("ticker")}
+              >
+                Ticker{sortMark("ticker")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("shares")}
+              >
+                Quantity{sortMark("shares")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("price")}
+              >
+                Price (Current){sortMark("price")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("avg_cost")}
+              >
+                Price (Avg){sortMark("avg_cost")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("dayChangePct")}
+              >
+                Day %{sortMark("dayChangePct")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("marketValue")}
+              >
+                Mkt Value ({display}){sortMark("marketValue")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("tx_count")}
+              >
+                Tx{sortMark("tx_count")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("unrealized")}
+              >
+                Unrealized ({display}){sortMark("unrealized")}
+              </TerminalTh>
+              <TerminalTh
+                className="text-right cursor-pointer select-none"
+                onClick={() => toggleSort("unrealizedPct")}
+              >
+                P&L %{sortMark("unrealizedPct")}
+              </TerminalTh>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {sortedRows.map((r) => {
               const native = r._nativeCurrency;
               const mvDisp = convert(r.marketValue, native);
               const unrealDisp = convert(r.unrealized, native);

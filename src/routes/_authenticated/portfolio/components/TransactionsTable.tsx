@@ -1,5 +1,6 @@
 import { TerminalTable } from "@/components/terminal/TerminalTable";
 import type { Dispatch, SetStateAction } from "react";
+import { useMemo, useState } from "react";
 
 type TransactionInputType = import("@/lib/portfolio/transactions/api").TransactionInputType;
 
@@ -16,6 +17,17 @@ type TransactionTableRow = {
   notes: string | null;
   portfolio_id: string | null;
 };
+
+type SortKey =
+  | "transaction_date"
+  | "ticker"
+  | "portfolio"
+  | "asset_type"
+  | "market"
+  | "shares"
+  | "price"
+  | "currency";
+type SortDirection = "asc" | "desc";
 
 export function TransactionsTable({
   data,
@@ -34,6 +46,59 @@ export function TransactionsTable({
   setEditing: Dispatch<SetStateAction<(TransactionInputType & { id?: string }) | null>>;
   onDelete: (id: string, ticker: string, transactionDate: string) => void;
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>("transaction_date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const sortedRows = useMemo(() => {
+    const rows = data.slice();
+    rows.sort((a, b) => {
+      const getValue = (row: TransactionTableRow) => {
+        switch (sortKey) {
+          case "transaction_date":
+            return row.transaction_date;
+          case "ticker":
+            return row.ticker;
+          case "portfolio":
+            return portfolioName(row.portfolio_id);
+          case "asset_type":
+            return row.asset_type;
+          case "market":
+            return row.market ?? "";
+          case "shares":
+            return Number(row.shares);
+          case "price":
+            return Number(row.price);
+          case "currency":
+            return row.currency;
+        }
+      };
+
+      const av = getValue(a);
+      const bv = getValue(b);
+      const dir = sortDirection === "asc" ? 1 : -1;
+
+      if (typeof av === "number" && typeof bv === "number") {
+        return (av - bv) * dir;
+      }
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+    return rows;
+  }, [data, portfolioName, sortDirection, sortKey]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+
+  const sortMark = (key: SortKey) => {
+    if (sortKey !== key) return "";
+    return sortDirection === "asc" ? " ↑" : " ↓";
+  };
+
   return (
     <TerminalTable variant="panel">
       <thead className="bg-secondary/40 text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -43,20 +108,60 @@ export function TransactionsTable({
               type="checkbox"
               checked={data.length > 0 && selected.size === data.length}
               onChange={(e) => {
-                if (e.target.checked) setSelected(new Set(data.map((p) => p.id)));
+                if (e.target.checked) setSelected(new Set(sortedRows.map((p) => p.id)));
                 else setSelected(new Set());
               }}
               className="accent-primary"
             />
           </th>
-          <th className="px-3 py-2 text-left">Date</th>
-          <th className="px-3 py-2 text-left">Ticker</th>
-          <th className="px-3 py-2 text-left">Portfolio</th>
-          <th className="px-3 py-2 text-left">Type</th>
-          <th className="px-3 py-2 text-left">Market</th>
-          <th className="px-3 py-2 text-right">Shares</th>
-          <th className="px-3 py-2 text-right">Price</th>
-          <th className="px-3 py-2 text-right">Ccy</th>
+          <th
+            className="px-3 py-2 text-left cursor-pointer select-none"
+            onClick={() => toggleSort("transaction_date")}
+          >
+            Date{sortMark("transaction_date")}
+          </th>
+          <th
+            className="px-3 py-2 text-left cursor-pointer select-none"
+            onClick={() => toggleSort("ticker")}
+          >
+            Ticker{sortMark("ticker")}
+          </th>
+          <th
+            className="px-3 py-2 text-left cursor-pointer select-none"
+            onClick={() => toggleSort("portfolio")}
+          >
+            Portfolio{sortMark("portfolio")}
+          </th>
+          <th
+            className="px-3 py-2 text-left cursor-pointer select-none"
+            onClick={() => toggleSort("asset_type")}
+          >
+            Type{sortMark("asset_type")}
+          </th>
+          <th
+            className="px-3 py-2 text-left cursor-pointer select-none"
+            onClick={() => toggleSort("market")}
+          >
+            Market{sortMark("market")}
+          </th>
+          <th
+            className="px-3 py-2 text-right cursor-pointer select-none"
+            onClick={() => toggleSort("shares")}
+          >
+            Shares{sortMark("shares")}
+          </th>
+          <th
+            className="px-3 py-2 text-right cursor-pointer select-none"
+            onClick={() => toggleSort("price")}
+          >
+            Price{sortMark("price")}
+          </th>
+          <th
+            className="px-3 py-2 text-right cursor-pointer select-none"
+            onClick={() => toggleSort("currency")}
+          >
+            Ccy{sortMark("currency")}
+          </th>
           <th className="px-3 py-2" />
         </tr>
       </thead>
@@ -75,7 +180,7 @@ export function TransactionsTable({
             </td>
           </tr>
         )}
-        {data.map((position) => (
+        {sortedRows.map((position) => (
           <tr key={position.id} className="border-t border-border/60 hover:bg-secondary/30">
             <td className="px-2 py-2 text-center">
               <input
