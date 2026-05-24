@@ -8,6 +8,7 @@ export interface Quote {
   symbol: string;
   inputSymbol: string;
   shortName?: string;
+  longName?: string;
   regularMarketPrice: number;
   regularMarketChange: number;
   regularMarketChangePercent: number;
@@ -15,6 +16,25 @@ export interface Quote {
   currency: string;
   exchange?: string;
   marketState?: string;
+  quoteType?: string;
+  assetProfile?: {
+    country?: string;
+    sector?: string;
+    industry?: string;
+  };
+  fundProfile?: {
+    category?: string;
+    family?: string;
+  };
+  price?: {
+    longName?: string;
+  };
+  quoteSummary?: {
+    quoteType?: {
+      quoteType?: string;
+    };
+  };
+  topHoldings?: Array<{ symbol?: string; weight?: number }>;
 }
 
 type CachedQ = { quote: Quote; ts: number };
@@ -53,6 +73,47 @@ function normalize(input: string, raw: RawQuote | undefined): Quote | null {
     symbol: String(raw.symbol ?? input).toUpperCase(),
     inputSymbol: input.toUpperCase(),
     shortName: optionalString(raw.shortName) ?? optionalString(raw.longName),
+    longName: optionalString(raw.longName) ?? optionalString(raw.shortName),
+    quoteType: optionalString(raw.quoteType),
+    assetProfile:
+      typeof raw.assetProfile === "object" && raw.assetProfile !== null
+        ? {
+            country: optionalString((raw.assetProfile as { country?: unknown }).country),
+            sector: optionalString((raw.assetProfile as { sector?: unknown }).sector),
+            industry: optionalString((raw.assetProfile as { industry?: unknown }).industry),
+          }
+        : undefined,
+    fundProfile:
+      typeof raw.fundProfile === "object" && raw.fundProfile !== null
+        ? {
+            category: optionalString((raw.fundProfile as { category?: unknown }).category),
+            family: optionalString((raw.fundProfile as { family?: unknown }).family),
+          }
+        : undefined,
+    price:
+      typeof raw.price === "object" && raw.price !== null
+        ? { longName: optionalString((raw.price as { longName?: unknown }).longName) }
+        : undefined,
+    quoteSummary:
+      typeof raw.quoteSummary === "object" && raw.quoteSummary !== null
+        ? {
+            quoteType: optionalString(
+              (raw.quoteSummary as { quoteType?: { quoteType?: unknown } }).quoteType?.quoteType,
+            ),
+          }
+        : undefined,
+    topHoldings: Array.isArray(raw.topHoldings)
+      ? raw.topHoldings
+          .map((item) =>
+            typeof item === "object" && item !== null
+              ? {
+                  symbol: optionalString((item as { symbol?: unknown }).symbol),
+                  weight: Number((item as { weight?: unknown }).weight) || undefined,
+                }
+              : null,
+          )
+          .filter((item): item is { symbol?: string; weight?: number } => Boolean(item))
+      : undefined,
     regularMarketPrice: p,
     regularMarketPreviousClose: pp,
     regularMarketChange: change,
