@@ -1,53 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { TerminalCard } from "@/components/terminal/TerminalCard";
-import { TerminalTable } from "@/components/terminal/TerminalTable";
-import { getQuotesClient } from "@/lib/portfolio/quotes.functions";
-import {
-  aggregateTransactions,
-  enrich,
-  fmt,
-  fmtCurrency,
-  fmtPct,
-  type TransactionRow,
-} from "@/lib/portfolio/portfolio";
+import { PnLBucket } from "@/routes/_authenticated/portfolio/components/PnLBucket";
+import { usePortfolioData } from "@/routes/_authenticated/portfolio/hooks/usePortfolioData";
+import { useQuotes } from "@/routes/_authenticated/portfolio/hooks/useQuotes";
 
 export const Route = createFileRoute("/_authenticated/portfolio/pnl")({
   component: PnL,
 });
 
 function PnL() {
-  // Fetch positions directly from Supabase
-  const txQ = useQuery({
-    queryKey: ["positions"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .order("transaction_date", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    },
-  });
-  const positions = useMemo(
-    () => aggregateTransactions((txQ.data ?? []) as TransactionRow[]),
-    [txQ.data],
-  );
-  const tickers = useMemo(
-    () => Array.from(new Set(positions.map((p) => p.ticker.toUpperCase()))),
-    [positions],
-  );
-  const quotesQ = useQuery({
-    queryKey: ["quotes", tickers.join(",")],
-    queryFn: () => getQuotesClient(tickers),
-    enabled: tickers.length > 0,
-  });
+  const { transactions } = usePortfolioData({ includePortfolios: false });
+  const { tickers, quotesQ, enrichedRows } = useQuotes(transactions);
 
   const rows = useMemo(
-    () => enrich(positions, quotesQ.data?.quotes ?? []).sort((a, b) => b.unrealized - a.unrealized),
-    [positions, quotesQ.data],
+    () => enrichedRows.slice().sort((a, b) => b.unrealized - a.unrealized),
+    [enrichedRows],
   );
 
   const gainers = rows.filter((r) => r.unrealized >= 0);
@@ -69,64 +36,9 @@ function PnL() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Bucket title="GAINERS" tone="bull" total={totalGain} rows={gainers} />
-        <Bucket title="LOSERS" tone="bear" total={totalLoss} rows={losers} />
+        <PnLBucket title="GAINERS" tone="bull" total={totalGain} rows={gainers} />
+        <PnLBucket title="LOSERS" tone="bear" total={totalLoss} rows={losers} />
       </div>
     </div>
-  );
-}
-
-function Bucket({
-  title,
-  tone,
-  total,
-  rows,
-}: {
-  title: string;
-  tone: "bull" | "bear";
-  total: number;
-  rows: ReturnType<typeof enrich>;
-}) {
-  return (
-    <TerminalCard
-      title={`${title} (${rows.length})`}
-      bodyClassName="p-0"
-      actions={
-        <span
-          className={`text-sm font-bold tabular-nums ${tone === "bull" ? "text-bull" : "text-bear"}`}
-        >
-          {fmtCurrency(total)}
-        </span>
-      }
-    >
-      <div className={`h-1 ${tone === "bull" ? "bg-bull/40" : "bg-bear/40"}`} />
-      {rows.length === 0 ? (
-        <div className="p-6 text-center text-xs text-muted-foreground">Nothing here. Good.</div>
-      ) : (
-        <TerminalTable>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b border-border/60">
-                <td className="px-3 py-2">
-                  <div className="font-bold text-primary">{r.ticker}</div>
-                  <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
-                    {r.quote?.shortName || r.name}
-                  </div>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-[11px] text-muted-foreground">
-                  {fmt(r.shares, { maximumFractionDigits: 4 })} @ {fmt(r.avg_cost)}
-                </td>
-                <td
-                  className={`px-3 py-2 text-right tabular-nums font-bold ${tone === "bull" ? "text-bull" : "text-bear"}`}
-                >
-                  <div>{fmtCurrency(r.unrealized, r.currency)}</div>
-                  <div className="text-[10px]">{fmtPct(r.unrealizedPct)}</div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TerminalTable>
-      )}
-    </TerminalCard>
   );
 }

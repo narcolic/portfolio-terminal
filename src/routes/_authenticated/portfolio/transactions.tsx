@@ -1,29 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { TerminalTable } from "@/components/terminal/TerminalTable";
 import { mapCsvRows, parseCSV } from "@/lib/csv";
-import { type PortfolioInputType } from "@/lib/portfolio/portfolios.functions";
-import { type TransactionInputType } from "@/lib/portfolio/positions.functions";
+import { type PortfolioInputType } from "@/lib/portfolio/portfolios/api";
+import { type TransactionInputType } from "@/lib/portfolio/transactions/api";
+import { TransactionsTable } from "@/routes/_authenticated/portfolio/components/TransactionsTable";
+import { TransactionEditor } from "@/routes/_authenticated/portfolio/components/TransactionEditor";
+import { usePortfolioData } from "@/routes/_authenticated/portfolio/hooks/usePortfolioData";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
-const MARKETS = [
-  "NASDAQ",
-  "NYSE",
-  "LSE",
-  "EPA",
-  "ETR",
-  "TSX",
-  "ASX",
-  "HKEX",
-  "TSE",
-  "CRYPTO",
-  "OTHER",
-];
-const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 const empty = (): TransactionInputType => ({
@@ -39,7 +26,7 @@ const empty = (): TransactionInputType => ({
   portfolio_id: null,
 });
 
-type PositionRow = {
+type TransactionTableRow = {
   id: string;
   ticker: string;
   name: string | null;
@@ -53,13 +40,6 @@ type PositionRow = {
   portfolio_id: string | null;
 };
 
-type PortfolioRow = {
-  id: string;
-  name: string;
-  broker: string | null;
-  notes: string | null;
-};
-
 function TransactionsPage() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,31 +48,9 @@ function TransactionsPage() {
   const [showPortfolios, setShowPortfolios] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const { data = [], isLoading } = useQuery<PositionRow[]>({
-    queryKey: ["positions"],
-    queryFn: async () => {
-      const { data: rows, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .order("transaction_date", { ascending: false });
-
-      if (error) throw new Error(error.message);
-      return (rows ?? []) as PositionRow[];
-    },
-  });
-
-  const { data: portfolios = [] } = useQuery<PortfolioRow[]>({
-    queryKey: ["portfolios"],
-    queryFn: async () => {
-      const { data: rows, error } = await supabase
-        .from("portfolios")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (error) throw new Error(error.message);
-      return (rows ?? []) as PortfolioRow[];
-    },
-  });
+  const { txQ, transactions, portfolios } = usePortfolioData();
+  const data = transactions as TransactionTableRow[];
+  const isLoading = txQ.isLoading;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["positions"] });
@@ -208,7 +166,6 @@ function TransactionsPage() {
         throw new Error("No valid rows to import");
       }
 
-      // Build a name -> id lookup from user's existing portfolios.
       const { data: userPortfolios, error: pfError } = await supabase
         .from("portfolios")
         .select("id,name")
@@ -220,7 +177,6 @@ function TransactionsPage() {
         if (p.name) portfolioIdByName.set(p.name.trim().toLowerCase(), p.id);
       }
 
-      // Ensure portfolios from CSV exist so each row can map to its intended portfolio.
       const csvPortfolioNames = Array.from(
         new Set(
           rows.map((row) => row.portfolio?.trim()).filter((name): name is string => Boolean(name)),
@@ -377,116 +333,22 @@ function TransactionsPage() {
         </div>
       )}
 
-      <TerminalTable variant="panel">
-        <thead className="bg-secondary/40 text-[10px] uppercase tracking-widest text-muted-foreground">
-          <tr>
-            <th className="px-2 py-2 text-center">
-              <input
-                type="checkbox"
-                checked={data.length > 0 && selected.size === data.length}
-                onChange={(e) => {
-                  if (e.target.checked) setSelected(new Set(data.map((p) => p.id)));
-                  else setSelected(new Set());
-                }}
-                className="accent-primary"
-              />
-            </th>
-            <th className="px-3 py-2 text-left">Date</th>
-            <th className="px-3 py-2 text-left">Ticker</th>
-            <th className="px-3 py-2 text-left">Portfolio</th>
-            <th className="px-3 py-2 text-left">Type</th>
-            <th className="px-3 py-2 text-left">Market</th>
-            <th className="px-3 py-2 text-right">Shares</th>
-            <th className="px-3 py-2 text-right">Price</th>
-            <th className="px-3 py-2 text-right">Ccy</th>
-            <th className="px-3 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading && (
-            <tr>
-              <td colSpan={10} className="p-6 text-center text-muted-foreground">
-                Loading...
-              </td>
-            </tr>
-          )}
-          {!isLoading && data.length === 0 && (
-            <tr>
-              <td colSpan={10} className="p-6 text-center text-muted-foreground">
-                No transactions yet
-              </td>
-            </tr>
-          )}
-          {data.map((position) => (
-            <tr key={position.id} className="border-t border-border/60 hover:bg-secondary/30">
-              <td className="px-2 py-2 text-center">
-                <input
-                  type="checkbox"
-                  checked={selected.has(position.id)}
-                  onChange={(e) => {
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(position.id);
-                      else next.delete(position.id);
-                      return next;
-                    });
-                  }}
-                  className="accent-primary"
-                />
-              </td>
-              <td className="px-3 py-2 text-[11px] tabular-nums">{position.transaction_date}</td>
-              <td className="px-3 py-2 font-bold text-primary">{position.ticker}</td>
-              <td className="px-3 py-2 text-[11px]">{portfolioName(position.portfolio_id)}</td>
-              <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
-              <td className="px-3 py-2 text-[11px]">{position.market || "-"}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">
-                {Number(position.price).toFixed(2)}
-              </td>
-              <td className="px-3 py-2 text-[11px]">{position.currency}</td>
-              <td className="px-3 py-2 text-right whitespace-nowrap">
-                <button
-                  onClick={() =>
-                    setEditing({
-                      id: position.id,
-                      ticker: position.ticker,
-                      name: position.name ?? "",
-                      asset_type: position.asset_type as TransactionInputType["asset_type"],
-                      market: position.market ?? "",
-                      currency: position.currency,
-                      shares: Number(position.shares),
-                      price: Number(position.price),
-                      transaction_date: position.transaction_date,
-                      notes: position.notes ?? "",
-                      portfolio_id: position.portfolio_id ?? null,
-                    })
-                  }
-                  className="mr-3 text-[11px] uppercase text-primary hover:underline"
-                >
-                  edit
-                </button>
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Delete transaction for ${position.ticker} on ${position.transaction_date}?`,
-                      )
-                    ) {
-                      deleteM.mutate(position.id);
-                    }
-                  }}
-                  className="text-[11px] uppercase text-bear hover:underline"
-                >
-                  del
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </TerminalTable>
+      <TransactionsTable
+        data={data}
+        isLoading={isLoading}
+        selected={selected}
+        setSelected={setSelected}
+        portfolioName={portfolioName}
+        setEditing={setEditing}
+        onDelete={(id, ticker, transactionDate) => {
+          if (confirm(`Delete transaction for ${ticker} on ${transactionDate}?`)) {
+            deleteM.mutate(id);
+          }
+        }}
+      />
 
       {editing && (
-        <EditModal
+        <TransactionEditor
           value={editing}
           portfolios={portfolios}
           onClose={() => setEditing(null)}
@@ -500,7 +362,7 @@ function TransactionsPage() {
 
       {showPortfolios && (
         <PortfoliosModal
-          portfolios={portfolios}
+          portfolios={portfolios as PortfolioRecord[]}
           onClose={() => setShowPortfolios(false)}
           onCreate={async (value) => {
             try {
@@ -522,177 +384,12 @@ function TransactionsPage() {
   );
 }
 
-function EditModal({
-  value,
-  portfolios,
-  onSave,
-  onClose,
-  busy,
-}: {
-  value: TransactionInputType & { id?: string };
-  portfolios: { id: string; name: string }[];
-  onSave: (v: TransactionInputType) => void;
-  onClose: () => void;
-  busy: boolean;
-}) {
-  const [v, setV] = useState(value);
-  const set = <K extends keyof TransactionInputType>(k: K, val: TransactionInputType[K]) => {
-    setV((state) => ({ ...state, [k]: val }));
-  };
-
-  return (
-    <div className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur md:items-center">
-      <div className="w-full max-w-lg border border-border bg-card">
-        <div className="flex justify-between border-b border-border bg-secondary/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-primary">
-          <span>&gt; {value.id ? "EDIT" : "NEW"} TRANSACTION</span>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            x
-          </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(v);
-          }}
-          className="grid grid-cols-2 gap-3 p-4"
-        >
-          <Field label="Date">
-            <input
-              type="date"
-              required
-              value={v.transaction_date}
-              onChange={(e) => set("transaction_date", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <Field label="Ticker">
-            <input
-              required
-              value={v.ticker}
-              onChange={(e) => set("ticker", e.target.value.toUpperCase())}
-              placeholder="AAPL"
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <Field label="Type">
-            <select
-              value={v.asset_type}
-              onChange={(e) =>
-                set("asset_type", e.target.value as TransactionInputType["asset_type"])
-              }
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {ASSET_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Currency">
-            <select
-              value={v.currency}
-              onChange={(e) => set("currency", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {CURRENCIES.map((ccy) => (
-                <option key={ccy}>{ccy}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Name" colSpan={2}>
-            <input
-              value={v.name ?? ""}
-              onChange={(e) => set("name", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <Field label="Portfolio" colSpan={2}>
-            <select
-              value={v.portfolio_id ?? ""}
-              onChange={(e) => set("portfolio_id", e.target.value || null)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              <option value="">- Unassigned -</option>
-              {portfolios.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Market">
-            <select
-              value={v.market ?? ""}
-              onChange={(e) => set("market", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {MARKETS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Shares">
-            <input
-              type="number"
-              step="any"
-              min="0"
-              required
-              value={v.shares}
-              onChange={(e) => set("shares", Number(e.target.value))}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm tabular-nums focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <Field label="Price / Share">
-            <input
-              type="number"
-              step="any"
-              min="0"
-              required
-              value={v.price}
-              onChange={(e) => set("price", Number(e.target.value))}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm tabular-nums focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <Field label="Notes" colSpan={2}>
-            <textarea
-              rows={2}
-              value={v.notes ?? ""}
-              onChange={(e) => set("notes", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </Field>
-
-          <div className="col-span-2 flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="border border-border px-4 py-1.5 text-xs uppercase tracking-widest hover:border-primary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className="bg-primary px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-primary-foreground disabled:opacity-50"
-            >
-              {busy ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+type PortfolioRecord = {
+  id: string;
+  name: string;
+  broker: string | null;
+  notes: string | null;
+};
 
 function PortfoliosModal({
   portfolios,
@@ -700,7 +397,7 @@ function PortfoliosModal({
   onCreate,
   onDelete,
 }: {
-  portfolios: PortfolioRow[];
+  portfolios: PortfolioRecord[];
   onClose: () => void;
   onCreate: (v: PortfolioInputType) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -800,25 +497,6 @@ function PortfoliosModal({
   );
 }
 
-function Field({
-  label,
-  children,
-  colSpan = 1,
-}: {
-  label: string;
-  children: ReactNode;
-  colSpan?: 1 | 2;
-}) {
-  return (
-    <label className={`block ${colSpan === 2 ? "col-span-2" : ""}`}>
-      <div className="mb-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-        {label}
-      </div>
-      {children}
-    </label>
-  );
-}
-
-export const Route = createFileRoute("/_authenticated/portfolio/positions")({
+export const Route = createFileRoute("/_authenticated/portfolio/transactions")({
   component: TransactionsPage,
 });

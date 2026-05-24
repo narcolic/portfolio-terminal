@@ -13,7 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPortfolioIndexRouteImport } from './routes/_authenticated/portfolio/index'
-import { Route as AuthenticatedPortfolioPositionsRouteImport } from './routes/_authenticated/portfolio/positions'
+import { Route as AuthenticatedPortfolioTransactionsRouteImport } from './routes/_authenticated/portfolio/transactions'
 import { Route as AuthenticatedPortfolioPnlRouteImport } from './routes/_authenticated/portfolio/pnl'
 
 const LoginRoute = LoginRouteImport.update({
@@ -30,58 +30,71 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedPortfolioIndexRoute = AuthenticatedPortfolioIndexRouteImport.update({
-  id: '/portfolio/',
-  path: '/portfolio/',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPortfolioPositionsRoute = AuthenticatedPortfolioPositionsRouteImport.update({
-  id: '/portfolio/positions',
-  path: '/portfolio/positions',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPortfolioPnlRoute = AuthenticatedPortfolioPnlRouteImport.update({
-  id: '/portfolio/pnl',
-  path: '/portfolio/pnl',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
+const AuthenticatedPortfolioIndexRoute =
+  AuthenticatedPortfolioIndexRouteImport.update({
+    id: '/portfolio/',
+    path: '/portfolio/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPortfolioTransactionsRoute =
+  AuthenticatedPortfolioTransactionsRouteImport.update({
+    id: '/portfolio/transactions',
+    path: '/portfolio/transactions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPortfolioPnlRoute =
+  AuthenticatedPortfolioPnlRouteImport.update({
+    id: '/portfolio/pnl',
+    path: '/portfolio/pnl',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/portfolio/': typeof AuthenticatedPortfolioIndexRoute
   '/portfolio/pnl': typeof AuthenticatedPortfolioPnlRoute
-  '/portfolio/positions': typeof AuthenticatedPortfolioPositionsRoute
+  '/portfolio/transactions': typeof AuthenticatedPortfolioTransactionsRoute
+  '/portfolio/': typeof AuthenticatedPortfolioIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/portfolio': typeof AuthenticatedPortfolioIndexRoute
   '/portfolio/pnl': typeof AuthenticatedPortfolioPnlRoute
-  '/portfolio/positions': typeof AuthenticatedPortfolioPositionsRoute
+  '/portfolio/transactions': typeof AuthenticatedPortfolioTransactionsRoute
+  '/portfolio': typeof AuthenticatedPortfolioIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
-  '/_authenticated/portfolio/': typeof AuthenticatedPortfolioIndexRoute
   '/_authenticated/portfolio/pnl': typeof AuthenticatedPortfolioPnlRoute
-  '/_authenticated/portfolio/positions': typeof AuthenticatedPortfolioPositionsRoute
+  '/_authenticated/portfolio/transactions': typeof AuthenticatedPortfolioTransactionsRoute
+  '/_authenticated/portfolio/': typeof AuthenticatedPortfolioIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/portfolio/' | '/portfolio/pnl' | '/portfolio/positions'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/portfolio/pnl'
+    | '/portfolio/transactions'
+    | '/portfolio/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/portfolio' | '/portfolio/pnl' | '/portfolio/positions'
+  to:
+    | '/'
+    | '/login'
+    | '/portfolio/pnl'
+    | '/portfolio/transactions'
+    | '/portfolio'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
-    | '/_authenticated/portfolio/'
     | '/_authenticated/portfolio/pnl'
-    | '/_authenticated/portfolio/positions'
+    | '/_authenticated/portfolio/transactions'
+    | '/_authenticated/portfolio/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -115,9 +128,16 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/portfolio/': {
       id: '/_authenticated/portfolio/'
-      path: '/portfolio/'
+      path: '/portfolio'
       fullPath: '/portfolio/'
       preLoaderRoute: typeof AuthenticatedPortfolioIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/portfolio/transactions': {
+      id: '/_authenticated/portfolio/transactions'
+      path: '/portfolio/transactions'
+      fullPath: '/portfolio/transactions'
+      preLoaderRoute: typeof AuthenticatedPortfolioTransactionsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/portfolio/pnl': {
@@ -127,26 +147,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortfolioPnlRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/portfolio/positions': {
-      id: '/_authenticated/portfolio/positions'
-      path: '/portfolio/positions'
-      fullPath: '/portfolio/positions'
-      preLoaderRoute: typeof AuthenticatedPortfolioPositionsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
   }
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedPortfolioIndexRoute: typeof AuthenticatedPortfolioIndexRoute
   AuthenticatedPortfolioPnlRoute: typeof AuthenticatedPortfolioPnlRoute
-  AuthenticatedPortfolioPositionsRoute: typeof AuthenticatedPortfolioPositionsRoute
+  AuthenticatedPortfolioTransactionsRoute: typeof AuthenticatedPortfolioTransactionsRoute
+  AuthenticatedPortfolioIndexRoute: typeof AuthenticatedPortfolioIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedPortfolioIndexRoute: AuthenticatedPortfolioIndexRoute,
   AuthenticatedPortfolioPnlRoute: AuthenticatedPortfolioPnlRoute,
-  AuthenticatedPortfolioPositionsRoute: AuthenticatedPortfolioPositionsRoute,
+  AuthenticatedPortfolioTransactionsRoute:
+    AuthenticatedPortfolioTransactionsRoute,
+  AuthenticatedPortfolioIndexRoute: AuthenticatedPortfolioIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

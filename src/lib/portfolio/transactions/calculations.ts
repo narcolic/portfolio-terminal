@@ -1,60 +1,15 @@
-import type { Quote } from "@/lib/portfolio/quotes.functions";
+import type { Quote } from "@/lib/portfolio/types";
 
-export type TransactionRow = {
-  id: string;
-  ticker: string;
-  name: string | null;
-  asset_type: string;
-  market: string | null;
-  currency: string;
-  shares: number;
-  price: number;
-  transaction_date: string;
-  notes: string | null;
-  portfolio_id: string | null;
-};
-
-export type PositionRow = {
-  id: string; // synthetic composite key
-  ticker: string;
-  name: string | null;
-  asset_type: string;
-  market: string | null;
-  currency: string;
-  shares: number;
-  avg_cost: number;
-  notes: string | null;
-  portfolio_id: string | null;
-  tx_count: number;
-  first_date: string | null;
-  last_date: string | null;
-};
-
-export type Enriched = PositionRow & {
-  price: number;
-  prevClose: number;
-  dayChange: number;
-  dayChangePct: number;
-  marketValue: number;
-  costBasis: number;
-  unrealized: number;
-  unrealizedPct: number;
-  quote?: Quote;
-};
-
-/**
- * Aggregate raw transactions into positions, grouping by ticker + portfolio + currency.
- * Weighted-average cost = Σ(shares*price) / Σ(shares).
- */
-export function aggregateTransactions(txs: TransactionRow[]): PositionRow[] {
-  const groups = new Map<string, TransactionRow[]>();
+export function aggregateTransactions(txs: import("@/lib/portfolio/types").TransactionRow[]) {
+  const groups = new Map<string, import("@/lib/portfolio/types").TransactionRow[]>();
   for (const t of txs) {
     const key = `${t.ticker.toUpperCase()}|${t.portfolio_id ?? ""}|${t.currency}`;
     const arr = groups.get(key) ?? [];
     arr.push(t);
     groups.set(key, arr);
   }
-  const out: PositionRow[] = [];
+
+  const out: import("@/lib/portfolio/types").HoldingRow[] = [];
   for (const [key, items] of groups) {
     const totalShares = items.reduce((s, t) => s + Number(t.shares), 0);
     const totalCost = items.reduce((s, t) => s + Number(t.shares) * Number(t.price), 0);
@@ -80,7 +35,10 @@ export function aggregateTransactions(txs: TransactionRow[]): PositionRow[] {
   return out.sort((a, b) => a.ticker.localeCompare(b.ticker));
 }
 
-export function enrich(positions: PositionRow[], quotes: Quote[]): Enriched[] {
+export function enrich(
+  positions: import("@/lib/portfolio/types").HoldingRow[],
+  quotes: Quote[],
+): import("@/lib/portfolio/types").Enriched[] {
   const map = new Map<string, Quote>();
   for (const q of quotes) {
     map.set(q.symbol.toUpperCase(), q);
@@ -109,25 +67,4 @@ export function enrich(positions: PositionRow[], quotes: Quote[]): Enriched[] {
       quote: q,
     };
   });
-}
-
-export function fmt(n: number, opts: Intl.NumberFormatOptions = {}) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    ...opts,
-  }).format(n);
-}
-
-export function fmtCurrency(n: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-export function fmtPct(n: number) {
-  const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(2)}%`;
 }
