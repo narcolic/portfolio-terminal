@@ -9,7 +9,6 @@ type TransactionTableRow = {
   ticker: string;
   name: string | null;
   asset_type: string;
-  market: string | null;
   currency: string;
   shares: number;
   price: number;
@@ -23,7 +22,6 @@ type SortKey =
   | "ticker"
   | "portfolio"
   | "asset_type"
-  | "market"
   | "shares"
   | "price"
   | "currency";
@@ -62,8 +60,6 @@ export function TransactionsTable({
             return portfolioName(row.portfolio_id);
           case "asset_type":
             return row.asset_type;
-          case "market":
-            return row.market ?? "";
           case "shares":
             return Number(row.shares);
           case "price":
@@ -139,12 +135,6 @@ export function TransactionsTable({
             Type{sortMark("asset_type")}
           </th>
           <th
-            className="px-3 py-2 text-left cursor-pointer select-none"
-            onClick={() => toggleSort("market")}
-          >
-            Market{sortMark("market")}
-          </th>
-          <th
             className="px-3 py-2 text-right cursor-pointer select-none"
             onClick={() => toggleSort("shares")}
           >
@@ -168,14 +158,14 @@ export function TransactionsTable({
       <tbody>
         {isLoading && (
           <tr>
-            <td colSpan={10} className="p-6 text-center text-muted-foreground">
+            <td colSpan={9} className="p-6 text-center text-muted-foreground">
               Loading...
             </td>
           </tr>
         )}
         {!isLoading && data.length === 0 && (
           <tr>
-            <td colSpan={10} className="p-6 text-center text-muted-foreground">
+            <td colSpan={9} className="p-6 text-center text-muted-foreground">
               No transactions yet
             </td>
           </tr>
@@ -201,7 +191,6 @@ export function TransactionsTable({
             <td className="px-3 py-2 font-bold text-primary">{position.ticker}</td>
             <td className="px-3 py-2 text-[11px]">{portfolioName(position.portfolio_id)}</td>
             <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
-            <td className="px-3 py-2 text-[11px]">{position.market || "-"}</td>
             <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
             <td className="px-3 py-2 text-right tabular-nums">
               {Number(position.price).toFixed(2)}
@@ -215,7 +204,6 @@ export function TransactionsTable({
                     ticker: position.ticker,
                     name: position.name ?? "",
                     asset_type: position.asset_type as TransactionInputType["asset_type"],
-                    market: position.market ?? "",
                     currency: position.currency,
                     shares: Number(position.shares),
                     price: Number(position.price),

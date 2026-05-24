@@ -8,7 +8,7 @@ import { type PortfolioInputType } from "@/lib/portfolio/portfolios/api";
 import { type TransactionInputType } from "@/lib/portfolio/transactions/api";
 import { TransactionsTable } from "@/routes/_authenticated/portfolio/components/TransactionsTable";
 import { TransactionEditor } from "@/routes/_authenticated/portfolio/components/TransactionEditor";
-import { usePortfolioData } from "@/routes/_authenticated/portfolio/hooks/usePortfolioData";
+import { type PortfolioRecord, usePortfolioData } from "@/routes/_authenticated/portfolio/hooks/usePortfolioData";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -17,7 +17,7 @@ const empty = (): TransactionInputType => ({
   ticker: "",
   name: "",
   asset_type: "stock",
-  market: "NASDAQ",
+  market: null,
   currency: "USD",
   shares: 0,
   price: 0,
@@ -31,7 +31,6 @@ type TransactionTableRow = {
   ticker: string;
   name: string | null;
   asset_type: string;
-  market: string | null;
   currency: string;
   shares: number;
   price: number;
@@ -208,6 +207,9 @@ function TransactionsPage() {
         const portfolioId = portfolioName
           ? (portfolioIdByName.get(portfolioName.toLowerCase()) ?? null)
           : null;
+        if (!portfolioId) {
+          throw new Error(`Could not resolve portfolio "${portfolioName ?? ""}" during import`);
+        }
 
         return {
           ticker: row.ticker,
@@ -215,7 +217,7 @@ function TransactionsPage() {
           asset_type: (ASSET_TYPES as readonly string[]).includes(row.asset_type ?? "")
             ? (row.asset_type as TransactionInputType["asset_type"])
             : "stock",
-          market: row.market ?? null,
+          market: null,
           currency: row.currency ?? "USD",
           shares: row.shares,
           price: row.price,
@@ -289,11 +291,12 @@ function TransactionsPage() {
         </summary>
         <div className="space-y-1 px-3 pb-3 text-muted-foreground">
           <p>
-            <strong className="text-foreground">Required columns:</strong> ticker, shares, price.
+            <strong className="text-foreground">Required columns:</strong> ticker, shares, price,
+            portfolio.
           </p>
           <p>
-            <strong className="text-foreground">Optional:</strong> transaction_date, portfolio,
-            asset_type, market, currency, notes.
+            <strong className="text-foreground">Optional:</strong> transaction_date, asset_type,
+            currency, notes.
           </p>
           <p>
             <strong className="text-foreground">Tickers:</strong> AAPL, AIR.PA, VOD.L, BTC-USD.
@@ -362,7 +365,7 @@ function TransactionsPage() {
 
       {showPortfolios && (
         <PortfoliosModal
-          portfolios={portfolios as PortfolioRecord[]}
+          portfolios={portfolios}
           onClose={() => setShowPortfolios(false)}
           onCreate={async (value) => {
             try {
@@ -383,13 +386,6 @@ function TransactionsPage() {
     </div>
   );
 }
-
-type PortfolioRecord = {
-  id: string;
-  name: string;
-  broker: string | null;
-  notes: string | null;
-};
 
 function PortfoliosModal({
   portfolios,

@@ -2,19 +2,6 @@ import { useState, type ReactNode } from "react";
 import type { TransactionInputType } from "@/lib/portfolio/transactions/api";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
-const MARKETS = [
-  "NASDAQ",
-  "NYSE",
-  "LSE",
-  "EPA",
-  "ETR",
-  "TSX",
-  "ASX",
-  "HKEX",
-  "TSE",
-  "CRYPTO",
-  "OTHER",
-];
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
 
 function Field({
@@ -128,27 +115,18 @@ export function TransactionEditor({
 
           <Field label="Portfolio" colSpan={2}>
             <select
+              required
               value={v.portfolio_id ?? ""}
               onChange={(e) => set("portfolio_id", e.target.value || null)}
               className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             >
-              <option value="">- Unassigned -</option>
+              <option value="" disabled>
+                Select portfolio
+              </option>
               {portfolios.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Market">
-            <select
-              value={v.market ?? ""}
-              onChange={(e) => set("market", e.target.value)}
-              className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
-            >
-              {MARKETS.map((m) => (
-                <option key={m}>{m}</option>
               ))}
             </select>
           </Field>

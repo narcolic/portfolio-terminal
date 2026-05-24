@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Enriched } from "@/lib/portfolio/types";
 
 const ALL = "__all__";
@@ -14,7 +14,7 @@ export function useTransactionsFilters({
   transactionCurrencies: string[];
 }) {
   const [selected, setSelected] = useState<string>(ALL);
-  const [display, setDisplay] = useState<string>("USD");
+  const [display, setDisplay] = useState<string>("EUR");
 
   const rows = useMemo(() => {
     if (selected === ALL) return allRows;

@@ -1,9 +1,3 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - tanstackStart, viteReact, tailwindcss, tsConfigPaths, cloudflare (build-only),
-//     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
-//     error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
@@ -11,6 +5,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import tailwind from "@tailwindcss/vite";
 import path from "path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import marketStatusHandler from "./api/market-status";
 import YahooFinance from "yahoo-finance2";
 
 const yahooFinance = new YahooFinance({
@@ -119,9 +114,61 @@ function createQuotesApiDevPlugin(): Plugin {
   };
 }
 
+function createMarketStatusApiDevPlugin(): Plugin {
+  return {
+    name: "market-status-api-dev-plugin",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(
+        "/api/market-status",
+        async (req: IncomingMessage, res: ServerResponse) => {
+          try {
+            const url = new URL(req.url ?? "", "http://localhost");
+            const exchanges = url.searchParams.getAll("exchanges");
+            const query =
+              exchanges.length === 0
+                ? undefined
+                : exchanges.length === 1
+                  ? exchanges[0]
+                  : exchanges;
+
+            const apiRequest = {
+              method: req.method ?? "GET",
+              query: { exchanges: query },
+            };
+
+            const apiResponse = {
+              status(code: number) {
+                res.statusCode = code;
+                res.setHeader("content-type", "application/json");
+                return {
+                  json(body: unknown) {
+                    res.end(JSON.stringify(body));
+                  },
+                };
+              },
+            };
+
+            await marketStatusHandler(apiRequest, apiResponse);
+          } catch (error: unknown) {
+            res.statusCode = 500;
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify({ error: errorMessage(error) }));
+          }
+        },
+      );
+    },
+  };
+}
+
 // Basic Vite config for Vercel deployment (no Lovable/Cloudflare plugins)
 export default defineConfig({
-  plugins: [react(), tsconfigPaths(), tailwind(), createQuotesApiDevPlugin()],
+  plugins: [
+    react(),
+    tsconfigPaths(),
+    tailwind(),
+    createQuotesApiDevPlugin(),
+    createMarketStatusApiDevPlugin(),
+  ],
   resolve: {
     conditions: ["browser"],
     alias: [

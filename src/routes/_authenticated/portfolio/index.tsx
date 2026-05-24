@@ -197,15 +197,6 @@ function Dashboard() {
             })}
           </div>
         </div>
-        <button
-          onClick={() => {
-            quotesQ.refetch();
-          }}
-          disabled={tickers.length === 0}
-          className="border border-border bg-card px-4 text-[11px] uppercase tracking-[0.2em] hover:text-primary disabled:opacity-50"
-        >
-          sync
-        </button>
         <div className="border border-border bg-card flex">
           {displayCurrencies.map((c) => (
             <button

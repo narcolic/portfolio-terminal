@@ -55,8 +55,6 @@ const ALIASES: Record<string, string> = {
   type: "asset_type",
   category: "asset_type",
   "asset type": "asset_type",
-  exchange: "market",
-  venue: "market",
   ccy: "currency",
   description: "name",
   label: "name",
@@ -71,11 +69,10 @@ const ALIASES: Record<string, string> = {
   transactiondate: "transaction_date",
 };
 
-export type CsvTransactionRow = {
+type CsvTransactionRow = {
   ticker: string;
   name?: string;
   asset_type?: string;
-  market?: string;
   currency?: string;
   shares: number;
   price: number;
@@ -114,7 +111,7 @@ export function mapCsvRows(rows: string[][]): {
     return ALIASES[k] ?? k.replace(/\s+/g, "_");
   });
   const idx = (k: string) => header.indexOf(k);
-  const required = ["ticker", "shares", "price"];
+  const required = ["ticker", "shares", "price", "portfolio"];
   const missing = required.filter((k) => idx(k) === -1);
   if (missing.length)
     return { rows: [], errors: [`Missing required column(s): ${missing.join(", ")}`] };
@@ -129,6 +126,7 @@ export function mapCsvRows(rows: string[][]): {
       return i === -1 ? "" : (cells[i] ?? "").trim();
     };
     const ticker = get("ticker").toUpperCase();
+    const portfolio = get("portfolio");
     const sharesN = Number(get("shares").replace(/,/g, ""));
     const priceN = Number((get("price") || "0").replace(/,/g, "")) || 0;
     const rawDate = get("transaction_date");
@@ -141,6 +139,10 @@ export function mapCsvRows(rows: string[][]): {
       errors.push(`Row ${r + 1}: invalid shares "${get("shares")}"`);
       continue;
     }
+    if (!portfolio) {
+      errors.push(`Row ${r + 1}: missing portfolio`);
+      continue;
+    }
     if (!date) {
       errors.push(`Row ${r + 1}: invalid date "${rawDate}"`);
       continue;
@@ -149,13 +151,12 @@ export function mapCsvRows(rows: string[][]): {
       ticker,
       name: get("name") || undefined,
       asset_type: (get("asset_type") || "stock").toLowerCase(),
-      market: get("market") || undefined,
       currency: (get("currency") || "USD").toUpperCase(),
       shares: sharesN,
       price: priceN,
       transaction_date: date,
       notes: get("notes") || undefined,
-      portfolio: get("portfolio") || undefined,
+      portfolio,
     });
   }
   return { rows: out, errors };

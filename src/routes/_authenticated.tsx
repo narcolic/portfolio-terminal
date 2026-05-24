@@ -2,6 +2,7 @@ import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/re
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
+import { MarketStatusIndicator } from "@/routes/_authenticated/portfolio/components/MarketStatusIndicator";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -33,7 +34,7 @@ function AuthLayout() {
       <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-2 text-[11px] uppercase tracking-[0.2em]">
           <div className="flex items-center gap-6">
-            <div className="font-bold text-primary">▰ PORTFOLIO TERMINAL</div>
+            <div className="font-bold text-primary">&gt; PORTFOLIO TERMINAL</div>
             <nav className="hidden md:flex items-center gap-1">
               <NavLink to="/portfolio">Dashboard</NavLink>
               <NavLink to="/portfolio/transactions">Transactions</NavLink>
@@ -50,7 +51,9 @@ function AuthLayout() {
                 timeZoneName: "short",
               })}
             </span>
-            <span className="hidden sm:inline text-bull ticker-blink">● LIVE</span>
+            <span className="hidden sm:inline">
+              <MarketStatusIndicator exchanges={["ATHEX", "NYSE", "XETR"]} />
+            </span>
             <span className="hidden md:inline truncate max-w-[160px]">{user?.email}</span>
             <button onClick={logout} className="text-primary hover:underline">
               [logout]
