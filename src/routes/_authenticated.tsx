@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Outlet, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
@@ -35,7 +35,14 @@ function AuthLayout() {
       <TopBar userEmail={user?.email} onLogout={logout} />
       <header className="border-b border-border bg-card sticky top-10 z-[9]">
         <div className="flex items-center justify-between px-4 py-2 text-[11px] uppercase tracking-[0.2em]">
-          <div className="font-bold text-primary">&gt; PORTFOLIO TERMINAL</div>
+          <div className="flex items-center gap-4">
+            <div className="font-bold text-primary">&gt; PORTFOLIO TERMINAL</div>
+            <nav className="hidden md:flex items-center gap-1 text-[10px] text-muted-foreground">
+              <RowNavLink to="/portfolio">Dashboard</RowNavLink>
+              <RowNavLink to="/portfolio/transactions">Transactions</RowNavLink>
+              <RowNavLink to="/portfolio/pnl">P&amp;L</RowNavLink>
+            </nav>
+          </div>
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
             <span className="hidden sm:inline">
               {now.toLocaleTimeString([], {
@@ -51,10 +58,28 @@ function AuthLayout() {
             </span>
           </div>
         </div>
+        <nav className="md:hidden flex border-t border-border text-[10px] uppercase tracking-[0.2em]">
+          <RowNavLink to="/portfolio">Dash</RowNavLink>
+          <RowNavLink to="/portfolio/transactions">Tx</RowNavLink>
+          <RowNavLink to="/portfolio/pnl">P&amp;L</RowNavLink>
+        </nav>
       </header>
       <main className="p-4 md:p-6 max-w-[1400px] mx-auto">
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function RowNavLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      activeOptions={{ exact: true }}
+      className="px-3 py-1 hover:text-foreground"
+      activeProps={{ className: "px-3 py-1 text-primary border-b-2 border-primary" }}
+    >
+      {children}
+    </Link>
   );
 }
