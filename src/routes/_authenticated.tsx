@@ -1,8 +1,9 @@
-import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect, Outlet, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { MarketStatusIndicator } from "@/routes/_authenticated/portfolio/components/MarketStatusIndicator";
+import { TopBar } from "@/components/shell/TopBar";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -31,16 +32,10 @@ function AuthLayout() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-10">
+      <TopBar userEmail={user?.email} onLogout={logout} />
+      <header className="border-b border-border bg-card sticky top-10 z-[9]">
         <div className="flex items-center justify-between px-4 py-2 text-[11px] uppercase tracking-[0.2em]">
-          <div className="flex items-center gap-6">
-            <div className="font-bold text-primary">&gt; PORTFOLIO TERMINAL</div>
-            <nav className="hidden md:flex items-center gap-1">
-              <NavLink to="/portfolio">Dashboard</NavLink>
-              <NavLink to="/portfolio/transactions">Transactions</NavLink>
-              <NavLink to="/portfolio/pnl">P&amp;L</NavLink>
-            </nav>
-          </div>
+          <div className="font-bold text-primary">&gt; PORTFOLIO TERMINAL</div>
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
             <span className="hidden sm:inline">
               {now.toLocaleTimeString([], {
@@ -54,34 +49,12 @@ function AuthLayout() {
             <span className="hidden sm:inline">
               <MarketStatusIndicator exchanges={["ATHEX", "NYSE", "XETR"]} />
             </span>
-            <span className="hidden md:inline truncate max-w-[160px]">{user?.email}</span>
-            <button onClick={logout} className="text-primary hover:underline">
-              [logout]
-            </button>
           </div>
         </div>
-        <nav className="md:hidden flex border-t border-border text-[11px] uppercase tracking-[0.2em]">
-          <NavLink to="/portfolio">Dash</NavLink>
-          <NavLink to="/portfolio/transactions">Tx</NavLink>
-          <NavLink to="/portfolio/pnl">P&amp;L</NavLink>
-        </nav>
       </header>
       <main className="p-4 md:p-6 max-w-[1400px] mx-auto">
         <Outlet />
       </main>
     </div>
-  );
-}
-
-function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
-  return (
-    <Link
-      to={to}
-      activeOptions={{ exact: true }}
-      className="px-3 py-1 hover:text-primary"
-      activeProps={{ className: "px-3 py-1 text-primary border-b-2 border-primary" }}
-    >
-      {children}
-    </Link>
   );
 }

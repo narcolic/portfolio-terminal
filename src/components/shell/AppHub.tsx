@@ -1,13 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { TerminalCard } from "@/components/terminal/TerminalCard";
-
-const dashboards = [
-  {
-    title: "Portfolio Tracker",
-    path: "/portfolio",
-    description: "Stocks & positions",
-  },
-] as const;
+import { dashboards } from "@/components/shell/dashboards";
 
 export function AppHub() {
   return (
@@ -22,15 +15,29 @@ export function AppHub() {
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {dashboards.map((dashboard) => (
-            <Link key={dashboard.path} to={dashboard.path} className="block">
-              <TerminalCard bodyClassName="p-4" className="h-full hover:border-primary">
+            dashboard.path ? (
+              <Link key={dashboard.title} to={dashboard.path} className="block">
+                <TerminalCard bodyClassName="p-4" className="h-full hover:border-primary">
+                  <div className="mt-2 text-lg font-bold text-primary">{dashboard.title}</div>
+                  <p className="mt-2 text-sm text-muted-foreground">{dashboard.description}</p>
+                  <div className="mt-4 text-[10px] uppercase tracking-[0.25em] text-foreground">
+                    &gt; open
+                  </div>
+                </TerminalCard>
+              </Link>
+            ) : (
+              <TerminalCard
+                key={dashboard.title}
+                bodyClassName="p-4"
+                className="h-full opacity-80 border-border/60"
+              >
                 <div className="mt-2 text-lg font-bold text-primary">{dashboard.title}</div>
                 <p className="mt-2 text-sm text-muted-foreground">{dashboard.description}</p>
-                <div className="mt-4 text-[10px] uppercase tracking-[0.25em] text-foreground">
-                  &gt; open
+                <div className="mt-4 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  &gt; coming soon
                 </div>
               </TerminalCard>
-            </Link>
+            )
           ))}
         </div>
       </div>

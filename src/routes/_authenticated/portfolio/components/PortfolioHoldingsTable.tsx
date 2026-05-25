@@ -157,7 +157,9 @@ export function PortfolioHoldingsTable({
                       {r.quote?.shortName || r.name || r.asset_type} · {native}
                     </div>
                   </td>
-                  <TerminalTd>{fmt(r.shares, { maximumFractionDigits: 2 })}</TerminalTd>
+                  <TerminalTd>
+                    {fmt(r.shares, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </TerminalTd>
                   <TerminalTd>{fmtCurrency(r.price, native)}</TerminalTd>
                   <TerminalTd>{fmtCurrency(r.avg_cost, native)}</TerminalTd>
                   <TerminalTd tone={r.dayChangePct >= 0 ? "bull" : "bear"}>
