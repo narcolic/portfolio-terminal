@@ -3,6 +3,8 @@ import type { RegionCategory } from "@/lib/portfolio/types";
 export const REGION_OVERRIDES: Record<string, RegionCategory> = {
   AETF: "Greece",
   "TPEIR.AT": "Greece",
+  ERNX: "Europe Developed",
+  "ERNX.DE": "Europe Developed",
   VUAA: "United States",
   DGRP: "United States",
   DGRW: "United States",
