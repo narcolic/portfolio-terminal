@@ -160,7 +160,7 @@ function createMarketStatusApiDevPlugin(): Plugin {
   };
 }
 
-// Basic Vite config for Vercel deployment (no Lovable/Cloudflare plugins)
+// Basic Vite config for Vercel deployment
 export default defineConfig({
   plugins: [
     react(),

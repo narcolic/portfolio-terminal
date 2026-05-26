@@ -21,9 +21,8 @@ export const dashboardCategories: DashboardCategory[] = [
       },
       {
         title: "Car Service & Expenses",
-        path: null,
+        path: "/car-service",
         description: "Maintenance, fuel, and running costs",
-        placeholder: true,
       },
       {
         title: "Energy & Power Bills",
