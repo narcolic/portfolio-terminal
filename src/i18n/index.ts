@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import en from "@/i18n/locales/en.json";
-import el from "@/i18n/locales/el.json";
+import en from "./locales/en.json";
+import el from "./locales/el.json";
 
 const STORAGE_KEY = "app.language";
 const saved = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
