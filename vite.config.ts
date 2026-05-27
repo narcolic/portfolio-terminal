@@ -160,6 +160,63 @@ function createMarketStatusApiDevPlugin(): Plugin {
   };
 }
 
+function createFxRatesApiDevPlugin(): Plugin {
+  return {
+    name: "fx-rates-api-dev-plugin",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use("/api/fx-rates", async (req: IncomingMessage, res: ServerResponse) => {
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        try {
+          const url = new URL(req.url ?? "", "http://localhost");
+          const from = (url.searchParams.get("from") ?? "USD").trim().toUpperCase();
+
+          const frankfurter = await fetch(
+            `https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}`,
+          );
+          if (frankfurter.ok) {
+            const data = await frankfurter.json();
+            res.statusCode = 200;
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify(data));
+            return;
+          }
+        } catch {
+          // fallback below
+        }
+
+        try {
+          const url = new URL(req.url ?? "", "http://localhost");
+          const from = (url.searchParams.get("from") ?? "USD").trim().toUpperCase();
+          const erApi = await fetch(
+            `https://open.er-api.com/v6/latest/${encodeURIComponent(from)}`,
+          );
+          if (erApi.ok) {
+            const data = (await erApi.json()) as { rates?: Record<string, number> };
+            if (data.rates) {
+              res.statusCode = 200;
+              res.setHeader("content-type", "application/json");
+              res.end(JSON.stringify({ rates: data.rates }));
+              return;
+            }
+          }
+        } catch {
+          // final fallback below
+        }
+
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ rates: { USD: 1 } }));
+      });
+    },
+  };
+}
+
 // Basic Vite config for Vercel deployment
 export default defineConfig({
   plugins: [
@@ -168,6 +225,7 @@ export default defineConfig({
     tailwind(),
     createQuotesApiDevPlugin(),
     createMarketStatusApiDevPlugin(),
+    createFxRatesApiDevPlugin(),
   ],
   resolve: {
     conditions: ["browser"],

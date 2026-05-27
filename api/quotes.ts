@@ -47,10 +47,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return;
     }
 
-    const quotes = await yahooFinance.quote(symbols);
-    const out = Array.isArray(quotes) ? quotes : [quotes];
-    res.status(200).json({ quotes: out });
+    const settled = await Promise.allSettled(
+      symbols.map(async (symbol) => {
+        const quote = await yahooFinance.quote(symbol);
+        return quote;
+      }),
+    );
+
+    const quotes: unknown[] = [];
+    const failed: Array<{ symbol: string; error: string }> = [];
+
+    settled.forEach((result, idx) => {
+      if (result.status === "fulfilled") {
+        quotes.push(result.value);
+        return;
+      }
+      failed.push({ symbol: symbols[idx], error: messageFrom(result.reason) });
+    });
+
+    res.status(200).json({ quotes, failed });
   } catch (error: unknown) {
-    res.status(500).json({ error: messageFrom(error) });
+    res.status(500).json({
+      error: messageFrom(error),
+      provider: "yahoo-finance2",
+      hint: "Check Vercel function runtime/logs for outbound fetch failures.",
+    });
   }
 }
