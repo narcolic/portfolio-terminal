@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { TransactionInputType } from "@/lib/portfolio/transactions/api";
+import { useTranslation } from "react-i18next";
 
 const ASSET_TYPES = ["stock", "etf", "crypto", "bond", "fund", "other"] as const;
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", "HKD"];
@@ -36,6 +37,7 @@ export function TransactionEditor({
   onClose: () => void;
   busy: boolean;
 }) {
+  const { t } = useTranslation();
   const [v, setV] = useState(value);
   const set = <K extends keyof TransactionInputType>(k: K, val: TransactionInputType[K]) => {
     setV((state) => ({ ...state, [k]: val }));
@@ -45,7 +47,7 @@ export function TransactionEditor({
     <div className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur md:items-center">
       <div className="w-full max-w-lg border border-border bg-card">
         <div className="flex justify-between border-b border-border bg-secondary/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-primary">
-          <span>&gt; {value.id ? "EDIT" : "NEW"} TRANSACTION</span>
+          <span>&gt; {value.id ? t("portfolio.editTransaction") : t("portfolio.newTransaction")}</span>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             x
           </button>
@@ -57,7 +59,7 @@ export function TransactionEditor({
           }}
           className="grid grid-cols-2 gap-3 p-4"
         >
-          <Field label="Date">
+          <Field label={t("portfolio.date")}>
             <input
               type="date"
               required
@@ -67,7 +69,7 @@ export function TransactionEditor({
             />
           </Field>
 
-          <Field label="Ticker">
+          <Field label={t("portfolio.ticker")}>
             <input
               required
               value={v.ticker}
@@ -77,7 +79,7 @@ export function TransactionEditor({
             />
           </Field>
 
-          <Field label="Type">
+          <Field label={t("portfolio.type")}>
             <select
               value={v.asset_type}
               onChange={(e) =>
@@ -93,7 +95,7 @@ export function TransactionEditor({
             </select>
           </Field>
 
-          <Field label="Currency">
+          <Field label={t("portfolio.currency")}>
             <select
               value={v.currency}
               onChange={(e) => set("currency", e.target.value)}
@@ -105,7 +107,7 @@ export function TransactionEditor({
             </select>
           </Field>
 
-          <Field label="Name" colSpan={2}>
+          <Field label={t("portfolio.name")} colSpan={2}>
             <input
               value={v.name ?? ""}
               onChange={(e) => set("name", e.target.value)}
@@ -113,7 +115,7 @@ export function TransactionEditor({
             />
           </Field>
 
-          <Field label="Portfolio" colSpan={2}>
+          <Field label={t("portfolio.portfolio")} colSpan={2}>
             <select
               required
               value={v.portfolio_id ?? ""}
@@ -121,7 +123,7 @@ export function TransactionEditor({
               className="w-full border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="" disabled>
-                Select portfolio
+                {t("portfolio.selectPortfolio")}
               </option>
               {portfolios.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -131,7 +133,7 @@ export function TransactionEditor({
             </select>
           </Field>
 
-          <Field label="Shares">
+          <Field label={t("portfolio.shares")}>
             <input
               type="number"
               step="any"
@@ -143,7 +145,7 @@ export function TransactionEditor({
             />
           </Field>
 
-          <Field label="Price / Share">
+          <Field label={t("portfolio.pricePerShare")}>
             <input
               type="number"
               step="any"
@@ -155,7 +157,7 @@ export function TransactionEditor({
             />
           </Field>
 
-          <Field label="Notes" colSpan={2}>
+          <Field label={t("portfolio.notes")} colSpan={2}>
             <textarea
               rows={2}
               value={v.notes ?? ""}
@@ -170,14 +172,14 @@ export function TransactionEditor({
               onClick={onClose}
               className="border border-border px-4 py-1.5 text-xs uppercase tracking-widest hover:border-primary"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
               disabled={busy}
               className="bg-primary px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-primary-foreground disabled:opacity-50"
             >
-              {busy ? "Saving..." : "Save"}
+              {busy ? t("portfolio.saving") : t("portfolio.save")}
             </button>
           </div>
         </form>

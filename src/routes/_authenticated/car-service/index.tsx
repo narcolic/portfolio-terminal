@@ -13,12 +13,14 @@ import {
   getTotalLifetimeCost,
   getTotalVisits,
 } from "@/routes/_authenticated/car-service/utils/carServiceUtils";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/_authenticated/car-service/")({
   component: CarServiceOverview,
 });
 
 function CarServiceOverview() {
+  const { t } = useTranslation();
   const { vehicles } = useVehicles();
   const [selectedVehicleId, setSelectedVehicleId] = useState("all");
   const { visits, isLoading, error } = useCarServiceData(selectedVehicleId);
@@ -33,7 +35,7 @@ function CarServiceOverview() {
     <div className="space-y-4 font-mono">
       <div className="border border-border bg-card px-4 py-2">
         <div className="text-[11px] uppercase tracking-[0.2em] text-primary">
-          &gt; CAR-SERVICE // OVERVIEW
+          {t("car.overview")}
         </div>
       </div>
 
@@ -45,30 +47,30 @@ function CarServiceOverview() {
 
       {error ? (
         <div className="border border-border bg-card px-4 py-2 text-[11px] text-bear uppercase tracking-[0.2em]">
-          ERROR: {error}
+          {t("car.error")}: {error}
         </div>
       ) : null}
 
       <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${isLoading ? "opacity-70" : ""}`}>
         <CarServiceKpiCard
-          label="TOTAL LIFETIME COST"
+          label={t("car.totalLifetimeCost")}
           value={isLoading ? "..." : formatCurrency(totalLifetimeCost)}
         />
         <CarServiceKpiCard
-          label="COST THIS YEAR"
+          label={t("car.costThisYear")}
           value={isLoading ? "..." : formatCurrency(costThisYear)}
         />
         <CarServiceKpiCard
-          label="LAST SERVICE DATE"
+          label={t("car.lastServiceDate")}
           value={isLoading ? "..." : lastVisit ? formatDate(lastVisit.service_date) : "--"}
         />
-        <CarServiceKpiCard label="TOTAL VISITS" value={isLoading ? "..." : String(totalVisits)} />
+        <CarServiceKpiCard label={t("car.totalVisits")} value={isLoading ? "..." : String(totalVisits)} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="border border-border bg-card">
           <div className="border-b border-border px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            RECENT VISITS
+            {t("car.recentVisits")}
           </div>
           <div className="p-4 text-[11px] text-muted-foreground space-y-2">
             {isLoading ? (
@@ -88,7 +90,7 @@ function CarServiceOverview() {
               </>
             ) : recentVisits.length === 0 ? (
               <div className="text-center uppercase tracking-[0.2em] py-2">
-                NO SERVICE RECORDS - ADD YOUR FIRST VISIT.
+                {t("car.noServiceRecords")}
               </div>
             ) : (
               recentVisits.map((visit) => (
@@ -100,7 +102,7 @@ function CarServiceOverview() {
                     {formatDate(visit.service_date)} | {formatKm(visit.odometer_km)}
                   </span>
                   <span className="text-right">
-                    {formatCurrency(Number(visit.total_amount))} | {visit.jobs.length} jobs
+                    {formatCurrency(Number(visit.total_amount))} | {visit.jobs.length} {t("car.jobs")}
                   </span>
                 </div>
               ))
@@ -110,7 +112,7 @@ function CarServiceOverview() {
 
         <section className="border border-border bg-card">
           <div className="border-b border-border px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            UPCOMING REMINDERS
+            {t("car.upcomingReminders")}
           </div>
           <div className="p-4 text-[11px] text-muted-foreground space-y-2">
             <div className="border-b border-border pb-2">--</div>

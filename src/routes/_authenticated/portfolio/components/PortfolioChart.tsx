@@ -1,5 +1,6 @@
 import { TerminalCard } from "@/components/terminal/TerminalCard";
 import { fmtCurrency } from "@/lib/portfolio/formatters";
+import { useTranslation } from "react-i18next";
 import {
   Bar,
   BarChart,
@@ -37,10 +38,11 @@ export function PortfolioChart({
   display: string;
   formatter?: (value: number, name: string) => string;
 }) {
+  const { t } = useTranslation();
   return (
     <TerminalCard title={title}>
       {data.length === 0 ? (
-        <div className="text-muted-foreground text-xs">No data</div>
+        <div className="text-muted-foreground text-xs">{t("common.noData")}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
           <div className="h-48">

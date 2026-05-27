@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { mapCsvRows, parseCSV } from "@/lib/csv";
 import { type PortfolioInputType } from "@/lib/portfolio/portfolios/api";
@@ -40,6 +41,7 @@ type TransactionTableRow = {
 };
 
 function TransactionsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -60,13 +62,13 @@ function TransactionsPage() {
     const { data, error } = await supabase.auth.getUser();
     if (error) throw new Error(error.message);
     const userId = data.user?.id;
-    if (!userId) throw new Error("You must be logged in to perform this action");
+    if (!userId) throw new Error(t("portfolio.mustBeLoggedIn"));
     return userId;
   };
 
   const portfolioName = useMemo(() => {
     const map = new Map(portfolios.map((p) => [p.id, p.name]));
-    return (id: string | null) => (id ? (map.get(id) ?? "-") : "Unassigned");
+    return (id: string | null) => (id ? (map.get(id) ?? "-") : t("portfolio.unassigned"));
   }, [portfolios]);
 
   const createM = useMutation({
@@ -79,7 +81,7 @@ function TransactionsPage() {
     onSuccess: () => {
       invalidate();
       setEditing(null);
-      toast.success("Transaction added");
+      toast.success(t("portfolio.transactionAdded"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -94,7 +96,7 @@ function TransactionsPage() {
     onSuccess: () => {
       invalidate();
       setEditing(null);
-      toast.success("Updated");
+      toast.success(t("portfolio.updated"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -106,7 +108,7 @@ function TransactionsPage() {
     },
     onSuccess: () => {
       invalidate();
-      toast.success("Removed");
+      toast.success(t("portfolio.removed"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -120,7 +122,7 @@ function TransactionsPage() {
     onSuccess: (result) => {
       invalidate();
       setSelected(new Set());
-      toast.success(`Deleted ${result.deleted} transactions`);
+      toast.success(t("portfolio.deletedTransactions", { count: result.deleted }));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -134,7 +136,7 @@ function TransactionsPage() {
     },
     onSuccess: () => {
       invalidate();
-      toast.success("Portfolio added");
+      toast.success(t("portfolio.portfolioAdded"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -146,7 +148,7 @@ function TransactionsPage() {
     },
     onSuccess: () => {
       invalidate();
-      toast.success("Portfolio removed");
+      toast.success(t("portfolio.portfolioRemoved"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -162,7 +164,7 @@ function TransactionsPage() {
         errors.slice(0, 3).forEach((error) => toast.error(error));
       }
       if (rows.length === 0) {
-        throw new Error("No valid rows to import");
+        throw new Error(t("portfolio.noValidRows"));
       }
 
       const { data: userPortfolios, error: pfError } = await supabase
@@ -192,7 +194,7 @@ function TransactionsPage() {
             {
               name: portfolioName,
               broker: portfolioName,
-              notes: "Imported via CSV",
+              notes: t("portfolio.importedViaCsv"),
               user_id: userId,
             },
           ])
@@ -208,7 +210,7 @@ function TransactionsPage() {
           ? (portfolioIdByName.get(portfolioName.toLowerCase()) ?? null)
           : null;
         if (!portfolioId) {
-          throw new Error(`Could not resolve portfolio "${portfolioName ?? ""}" during import`);
+          throw new Error(t("portfolio.couldNotResolvePortfolio", { name: portfolioName ?? "" }));
         }
 
         return {
@@ -234,7 +236,7 @@ function TransactionsPage() {
     },
     onSuccess: (result) => {
       invalidate();
-      toast.success(`Imported ${result.inserted} transactions`);
+      toast.success(t("portfolio.importedTransactions", { count: result.inserted }));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -243,9 +245,9 @@ function TransactionsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl uppercase tracking-[0.2em]">&gt; TRANSACTIONS</h1>
+          <h1 className="text-xl uppercase tracking-[0.2em]">{t("portfolio.transactionsTitle")}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Each row is a single buy. Average cost per holding is computed automatically.
+            {t("portfolio.transactionsSubtitle")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -253,7 +255,7 @@ function TransactionsPage() {
             onClick={() => setShowPortfolios(true)}
             className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary"
           >
-            Portfolios ({portfolios.length})
+            {t("portfolio.portfolios")} ({portfolios.length})
           </button>
 
           <input
@@ -273,33 +275,33 @@ function TransactionsPage() {
             disabled={importM.isPending}
             className="border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-primary disabled:opacity-50"
           >
-            {importM.isPending ? "Importing..." : "Upload CSV"}
+            {importM.isPending ? t("portfolio.importing") : t("portfolio.uploadCsv")}
           </button>
 
           <button
             onClick={() => setEditing(empty())}
             className="bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground hover:opacity-90"
           >
-            New
+            {t("portfolio.new")}
           </button>
         </div>
       </div>
 
       <details className="border border-border bg-card/50 text-[11px]">
         <summary className="cursor-pointer px-3 py-2 uppercase tracking-[0.2em] text-muted-foreground hover:text-primary">
-          CSV format help
+          {t("portfolio.csvFormatHelp")}
         </summary>
         <div className="space-y-1 px-3 pb-3 text-muted-foreground">
           <p>
-            <strong className="text-foreground">Required columns:</strong> ticker, shares, price,
+            <strong className="text-foreground">{t("portfolio.requiredColumns")}</strong> ticker, shares, price,
             portfolio.
           </p>
           <p>
-            <strong className="text-foreground">Optional:</strong> transaction_date, asset_type,
+            <strong className="text-foreground">{t("portfolio.optionalColumns")}</strong> transaction_date, asset_type,
             currency, notes.
           </p>
           <p>
-            <strong className="text-foreground">Tickers:</strong> AAPL, AIR.PA, VOD.L, BTC-USD.
+            <strong className="text-foreground">{t("portfolio.tickers")}</strong> AAPL, AIR.PA, VOD.L, BTC-USD.
           </p>
           <pre className="mt-2 overflow-x-auto border border-border bg-background p-2">
             {`transaction_date,ticker,asset_type,currency,shares,price,portfolio
@@ -314,24 +316,24 @@ function TransactionsPage() {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 border border-bear/30 bg-bear/5 px-3 py-2 text-[11px]">
           <span className="font-bold uppercase tracking-widest text-bear">
-            {selected.size} selected
+            {t("portfolio.selectedCount", { count: selected.size })}
           </span>
           <button
             onClick={() => {
-              if (confirm(`Delete ${selected.size} transactions?`)) {
+              if (confirm(t("portfolio.deleteTransactionsConfirm", { count: selected.size }))) {
                 bulkDeleteM.mutate(Array.from(selected));
               }
             }}
             disabled={bulkDeleteM.isPending}
             className="border border-bear px-3 py-1 text-[10px] uppercase tracking-widest text-bear hover:bg-bear hover:text-white disabled:opacity-50"
           >
-            {bulkDeleteM.isPending ? "Deleting..." : "Delete selected"}
+            {bulkDeleteM.isPending ? t("portfolio.deleting") : t("portfolio.deleteSelected")}
           </button>
           <button
             onClick={() => setSelected(new Set())}
             className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
           >
-            Cancel
+            {t("portfolio.cancel")}
           </button>
         </div>
       )}
@@ -344,7 +346,7 @@ function TransactionsPage() {
         portfolioName={portfolioName}
         setEditing={setEditing}
         onDelete={(id, ticker, transactionDate) => {
-          if (confirm(`Delete transaction for ${ticker} on ${transactionDate}?`)) {
+          if (confirm(t("portfolio.deleteTransactionConfirm", { ticker, date: transactionDate }))) {
             deleteM.mutate(id);
           }
         }}
@@ -398,6 +400,7 @@ function PortfoliosModal({
   onCreate: (v: PortfolioInputType) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [broker, setBroker] = useState("");
   const [notes, setNotes] = useState("");
@@ -406,7 +409,7 @@ function PortfoliosModal({
     <div className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur md:items-center">
       <div className="w-full max-w-md border border-border bg-card">
         <div className="flex justify-between border-b border-border bg-secondary/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-primary">
-          <span>&gt; PORTFOLIOS</span>
+          <span>{t("portfolio.portfoliosTitle")}</span>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             x
           </button>
@@ -432,34 +435,34 @@ function PortfoliosModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Name (e.g. Main Portfolio)"
+              placeholder={t("portfolio.portfolioNamePlaceholder")}
               className="col-span-2 border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             />
             <input
               value={broker}
               onChange={(e) => setBroker(e.target.value)}
-              placeholder="Broker (optional)"
+              placeholder={t("portfolio.portfolioBrokerPlaceholder")}
               className="col-span-2 border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             />
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes (optional)"
+              placeholder={t("portfolio.portfolioNotesPlaceholder")}
               className="col-span-2 border border-border bg-input px-2 py-1.5 text-sm focus:border-primary focus:outline-none"
             />
             <button
               type="submit"
               className="col-span-2 bg-primary px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground hover:opacity-90"
             >
-              Add Portfolio
+              {t("portfolio.addPortfolio")}
             </button>
           </form>
 
           <div className="border border-border">
             {portfolios.length === 0 && (
               <div className="p-3 text-center text-[11px] text-muted-foreground">
-                No portfolios yet
+                {t("portfolio.noPortfoliosYet")}
               </div>
             )}
             {portfolios.map((p) => (
@@ -469,20 +472,20 @@ function PortfoliosModal({
               >
                 <div>
                   <div className="font-bold">{p.name}</div>
-                  <div className="text-[10px] text-muted-foreground">Broker: {p.broker || "-"}</div>
-                  <div className="text-[10px] text-muted-foreground">Notes: {p.notes || "-"}</div>
+                  <div className="text-[10px] text-muted-foreground">{t("portfolio.broker")}: {p.broker || "-"}</div>
+                  <div className="text-[10px] text-muted-foreground">{t("portfolio.notes")}: {p.notes || "-"}</div>
                 </div>
                 <button
                   onClick={() => {
                     if (
-                      confirm(`Delete portfolio "${p.name}"? Transactions will become unassigned.`)
+                      confirm(t("portfolio.deletePortfolioConfirm", { name: p.name }))
                     ) {
                       onDelete(p.id);
                     }
                   }}
                   className="text-[10px] uppercase text-bear hover:underline"
                 >
-                  del
+                    {t("common.deleteShort")}
                 </button>
               </div>
             ))}

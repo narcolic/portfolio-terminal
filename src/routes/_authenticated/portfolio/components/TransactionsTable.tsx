@@ -1,6 +1,7 @@
 import { TerminalTable } from "@/components/terminal/TerminalTable";
 import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type TransactionInputType = import("@/lib/portfolio/transactions/api").TransactionInputType;
 
@@ -44,6 +45,7 @@ export function TransactionsTable({
   setEditing: Dispatch<SetStateAction<(TransactionInputType & { id?: string }) | null>>;
   onDelete: (id: string, ticker: string, transactionDate: string) => void;
 }) {
+  const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<SortKey>("transaction_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -72,10 +74,7 @@ export function TransactionsTable({
       const av = getValue(a);
       const bv = getValue(b);
       const dir = sortDirection === "asc" ? 1 : -1;
-
-      if (typeof av === "number" && typeof bv === "number") {
-        return (av - bv) * dir;
-      }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
       return String(av).localeCompare(String(bv)) * dir;
     });
     return rows;
@@ -90,10 +89,7 @@ export function TransactionsTable({
     setSortDirection("asc");
   };
 
-  const sortMark = (key: SortKey) => {
-    if (sortKey !== key) return "";
-    return sortDirection === "asc" ? " ↑" : " ↓";
-  };
+  const sortMark = (key: SortKey) => (sortKey !== key ? "" : sortDirection === "asc" ? " ↑" : " ↓");
 
   return (
     <TerminalTable variant="panel">
@@ -110,47 +106,33 @@ export function TransactionsTable({
               className="accent-primary"
             />
           </th>
-          <th
-            className="px-3 py-2 text-left cursor-pointer select-none"
-            onClick={() => toggleSort("transaction_date")}
-          >
-            Date{sortMark("transaction_date")}
+          <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort("transaction_date")}>
+            {t("portfolio.date")}
+            {sortMark("transaction_date")}
           </th>
-          <th
-            className="px-3 py-2 text-left cursor-pointer select-none"
-            onClick={() => toggleSort("ticker")}
-          >
-            Ticker{sortMark("ticker")}
+          <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort("ticker")}>
+            {t("portfolio.ticker")}
+            {sortMark("ticker")}
           </th>
-          <th
-            className="px-3 py-2 text-left cursor-pointer select-none"
-            onClick={() => toggleSort("portfolio")}
-          >
-            Portfolio{sortMark("portfolio")}
+          <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort("portfolio")}>
+            {t("portfolio.portfolio")}
+            {sortMark("portfolio")}
           </th>
-          <th
-            className="px-3 py-2 text-left cursor-pointer select-none"
-            onClick={() => toggleSort("asset_type")}
-          >
-            Type{sortMark("asset_type")}
+          <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => toggleSort("asset_type")}>
+            {t("portfolio.type")}
+            {sortMark("asset_type")}
           </th>
-          <th
-            className="px-3 py-2 text-right cursor-pointer select-none"
-            onClick={() => toggleSort("shares")}
-          >
-            Shares{sortMark("shares")}
+          <th className="px-3 py-2 text-right cursor-pointer select-none" onClick={() => toggleSort("shares")}>
+            {t("portfolio.shares")}
+            {sortMark("shares")}
           </th>
-          <th
-            className="px-3 py-2 text-right cursor-pointer select-none"
-            onClick={() => toggleSort("price")}
-          >
-            Price{sortMark("price")}
+          <th className="px-3 py-2 text-right cursor-pointer select-none" onClick={() => toggleSort("price")}>
+            {t("portfolio.price")}
+            {sortMark("price")}
           </th>
-          <th
-            className="px-3 py-2 text-right cursor-pointer select-none"
-            onClick={() => toggleSort("currency")}
-          >
-            Ccy{sortMark("currency")}
+          <th className="px-3 py-2 text-right cursor-pointer select-none" onClick={() => toggleSort("currency")}>
+            {t("portfolio.ccy")}
+            {sortMark("currency")}
           </th>
           <th className="px-3 py-2" />
         </tr>
@@ -159,14 +141,14 @@ export function TransactionsTable({
         {isLoading && (
           <tr>
             <td colSpan={9} className="p-6 text-center text-muted-foreground">
-              Loading...
+              {t("common.loading")}
             </td>
           </tr>
         )}
         {!isLoading && data.length === 0 && (
           <tr>
             <td colSpan={9} className="p-6 text-center text-muted-foreground">
-              No transactions yet
+              {t("portfolio.noTransactionsYet")}
             </td>
           </tr>
         )}
@@ -192,9 +174,7 @@ export function TransactionsTable({
             <td className="px-3 py-2 text-[11px]">{portfolioName(position.portfolio_id)}</td>
             <td className="px-3 py-2 text-[11px] uppercase">{position.asset_type}</td>
             <td className="px-3 py-2 text-right tabular-nums">{Number(position.shares)}</td>
-            <td className="px-3 py-2 text-right tabular-nums">
-              {Number(position.price).toFixed(2)}
-            </td>
+            <td className="px-3 py-2 text-right tabular-nums">{Number(position.price).toFixed(2)}</td>
             <td className="px-3 py-2 text-[11px]">{position.currency}</td>
             <td className="px-3 py-2 text-right whitespace-nowrap">
               <button
@@ -214,13 +194,13 @@ export function TransactionsTable({
                 }
                 className="mr-3 text-[11px] uppercase text-primary hover:underline"
               >
-                edit
+                {t("common.edit")}
               </button>
               <button
                 onClick={() => onDelete(position.id, position.ticker, position.transaction_date)}
                 className="text-[11px] uppercase text-bear hover:underline"
               >
-                del
+                {t("common.deleteShort")}
               </button>
             </td>
           </tr>

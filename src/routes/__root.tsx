@@ -4,21 +4,21 @@ import { useEffect } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "sonner";
+import { useTranslation } from "react-i18next";
 
 function NotFoundComponent() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <div className="text-xs uppercase tracking-[0.3em] text-primary">Error 404</div>
         <h1 className="mt-2 text-6xl font-bold text-foreground">NO_ROUTE</h1>
-        <p className="mt-4 text-sm text-muted-foreground">
-          The terminal could not locate that page.
-        </p>
+        <p className="mt-4 text-sm text-muted-foreground">{t("root.notFoundBody")}</p>
         <Link
           to="/"
           className="mt-6 inline-flex items-center gap-2 border border-primary px-4 py-2 text-xs uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
         >
-          &gt; return_home
+          {t("root.returnHome")}
         </Link>
       </div>
     </div>
@@ -26,13 +26,14 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const { t } = useTranslation();
   console.error(error);
   const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <div className="text-xs uppercase tracking-[0.3em] text-destructive">System fault</div>
-        <h1 className="mt-2 text-2xl text-foreground">Page did not load</h1>
+        <div className="text-xs uppercase tracking-[0.3em] text-destructive">{t("root.systemFault")}</div>
+        <h1 className="mt-2 text-2xl text-foreground">{t("root.pageDidNotLoad")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <div className="mt-6 flex justify-center gap-2">
           <button
@@ -42,7 +43,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             }}
             className="border border-primary px-4 py-2 text-xs uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
           >
-            &gt; retry
+            {t("root.retry")}
           </button>
         </div>
       </div>

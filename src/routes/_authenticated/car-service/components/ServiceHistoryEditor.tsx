@@ -6,6 +6,7 @@ import type {
   Vehicle,
 } from "@/routes/_authenticated/car-service/types";
 import { formatCurrency } from "@/routes/_authenticated/car-service/utils/carServiceUtils";
+import { useTranslation } from "react-i18next";
 
 const CATEGORY_SUGGESTIONS = [
   "AC",
@@ -87,6 +88,7 @@ export function ServiceHistoryEditor({
   }) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const initialVehicleId =
     initialVisit?.vehicle_id ?? defaultVehicleId ?? (vehicles.length === 1 ? vehicles[0].id : "");
 
@@ -155,11 +157,11 @@ export function ServiceHistoryEditor({
     const nextErrors: FieldErrors = {};
     const rowErrors: Record<number, string> = {};
 
-    if (!form.vehicleId) nextErrors.vehicleId = "Vehicle is required.";
-    if (!form.serviceDate) nextErrors.serviceDate = "Service date is required.";
+    if (!form.vehicleId) nextErrors.vehicleId = t("car.editor.vehicleRequired");
+    if (!form.serviceDate) nextErrors.serviceDate = t("car.editor.serviceDateRequired");
 
     const km = Number(form.odometerKm);
-    if (!Number.isFinite(km) || km < 0) nextErrors.odometerKm = "KM must be zero or greater.";
+    if (!Number.isFinite(km) || km < 0) nextErrors.odometerKm = t("car.editor.kmRequired");
 
     const validLines: ServiceJobInput[] = [];
 
@@ -169,17 +171,17 @@ export function ServiceHistoryEditor({
       const price = Number(line.unitPriceExVat);
 
       if (!jobName) {
-        rowErrors[index] = "Job name is required.";
+        rowErrors[index] = t("car.editor.jobNameRequired");
         return;
       }
 
-      if (!Number.isFinite(price) || price <= 0) {
-        rowErrors[index] = "Price must be greater than 0.";
+      if (!Number.isFinite(price) || price < 0) {
+        rowErrors[index] = t("car.editor.priceRequired");
         return;
       }
 
       if (!Number.isFinite(quantity) || quantity <= 0) {
-        rowErrors[index] = "Quantity must be greater than 0.";
+        rowErrors[index] = t("car.editor.quantityRequired");
         return;
       }
 
@@ -192,7 +194,7 @@ export function ServiceHistoryEditor({
       });
     });
 
-    if (validLines.length === 0) nextErrors.jobs = "At least one job is required.";
+    if (validLines.length === 0) nextErrors.jobs = t("car.editor.oneJobRequired");
     if (Object.keys(rowErrors).length > 0) nextErrors.jobRows = rowErrors;
 
     setErrors(nextErrors);
@@ -222,13 +224,13 @@ export function ServiceHistoryEditor({
     <form onSubmit={save} className="border border-border bg-card font-mono">
       <section className="p-4 md:p-6">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="VEHICLE" error={errors.vehicleId}>
+          <Field label={t("car.editor.vehicle")} error={errors.vehicleId}>
             <select
               value={form.vehicleId}
               onChange={(e) => setFormField("vehicleId", e.target.value)}
               className="w-full border border-border bg-input px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
             >
-              <option value="">Select vehicle</option>
+              <option value="">{t("car.editor.selectVehicle")}</option>
               {vehicles.map((vehicle) => (
                 <option key={vehicle.id} value={vehicle.id}>
                   {`${vehicle.make ?? ""} ${vehicle.model ?? ""} ${vehicle.year ?? ""}`.trim()}
@@ -237,7 +239,7 @@ export function ServiceHistoryEditor({
             </select>
           </Field>
 
-          <Field label="DATE" error={errors.serviceDate}>
+          <Field label={t("car.editor.date")} error={errors.serviceDate}>
             <input
               type="date"
               value={form.serviceDate}
@@ -246,7 +248,7 @@ export function ServiceHistoryEditor({
             />
           </Field>
 
-          <Field label="KM" error={errors.odometerKm}>
+          <Field label={t("car.editor.km")} error={errors.odometerKm}>
             <input
               type="number"
               min="0"
@@ -256,7 +258,7 @@ export function ServiceHistoryEditor({
             />
           </Field>
 
-          <Field label="GARAGE">
+          <Field label={t("car.editor.garage")}>
             <input
               type="text"
               value={form.workshop}
@@ -265,7 +267,7 @@ export function ServiceHistoryEditor({
             />
           </Field>
 
-          <Field label="VAT RATE %">
+          <Field label={t("car.editor.vatRate")}>
             <input
               type="number"
               step="0.01"
@@ -276,7 +278,7 @@ export function ServiceHistoryEditor({
             />
           </Field>
 
-          <Field label="NOTES" className="md:col-span-2">
+          <Field label={t("car.editor.notes")} className="md:col-span-2">
             <textarea
               rows={2}
               value={form.notes}
@@ -290,13 +292,14 @@ export function ServiceHistoryEditor({
       <div className="border-b border-border" />
 
       <section className="p-4 md:p-6 space-y-3">
-        <div className="grid grid-cols-12 gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          <div className="col-span-3">JOB / TASK</div>
-          <div className="col-span-2">CATEGORY</div>
-          <div className="col-span-2 text-right">PRICE EX VAT</div>
-          <div className="col-span-1 text-right">QTY</div>
-          <div className="col-span-2 text-right">LINE TOTAL</div>
-          <div className="col-span-2 text-right">REMOVE</div>
+        <div className="grid grid-cols-14 gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="col-span-3">{t("car.editor.jobTask")}</div>
+          <div className="col-span-2">{t("car.editor.category")}</div>
+          <div className="col-span-2 text-right">{t("car.editor.priceExVat")}</div>
+          <div className="col-span-1 text-right">{t("car.editor.qty")}</div>
+          <div className="col-span-2 text-right">{t("car.editor.lineTotal")}</div>
+          <div className="col-span-2">{t("car.editor.notes")}</div>
+          <div className="col-span-2 text-right">{t("car.editor.remove")}</div>
         </div>
 
         {lines.map((line, index) => {
@@ -314,7 +317,7 @@ export function ServiceHistoryEditor({
 
           return (
             <div key={`line-${index}`} className="space-y-1">
-              <div className="grid grid-cols-12 gap-2 text-[11px]">
+              <div className="grid grid-cols-14 gap-2 text-[11px]">
                 <div className="col-span-3 relative">
                   <input
                     value={line.jobName}
@@ -349,7 +352,7 @@ export function ServiceHistoryEditor({
                           }}
                           className="block w-full px-2 py-1.5 text-left hover:bg-primary/10 hover:text-primary"
                         >
-                          Create "{line.jobName.trim()}"
+                          {t("car.editor.createValue", { value: line.jobName.trim() })}
                         </button>
                       ) : null}
                     </div>
@@ -394,7 +397,7 @@ export function ServiceHistoryEditor({
                           }}
                           className="block w-full px-2 py-1.5 text-left hover:bg-primary/10 hover:text-primary"
                         >
-                          Create "{line.category.trim().toUpperCase()}"
+                          {t("car.editor.createValue", { value: line.category.trim().toUpperCase() })}
                         </button>
                       ) : null}
                     </div>
@@ -424,6 +427,13 @@ export function ServiceHistoryEditor({
                 <div className="col-span-2 px-2 py-1.5 text-right text-muted-foreground">
                   {formatCurrency(computedLines[index]?.total ?? 0)}
                 </div>
+                <div className="col-span-2">
+                  <input
+                    value={line.notes}
+                    onChange={(e) => setLineField(index, "notes", e.target.value)}
+                    className="w-full border border-border bg-input px-2 py-1.5 text-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
                 <div className="col-span-2 text-right">
                   <button
                     type="button"
@@ -446,7 +456,7 @@ export function ServiceHistoryEditor({
           onClick={addLine}
           className="text-[11px] uppercase tracking-[0.2em] text-primary hover:underline"
         >
-          + ADD JOB
+          {t("car.editor.addJob")}
         </button>
         {errors.jobs ? <div className="text-[11px] text-destructive">{errors.jobs}</div> : null}
       </section>
@@ -454,15 +464,15 @@ export function ServiceHistoryEditor({
       <div className="border-t border-border p-4 md:p-6">
         <div className="ml-auto w-full max-w-xs space-y-2 text-[11px] uppercase tracking-[0.2em]">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">SUBTOTAL EX VAT</span>
+            <span className="text-muted-foreground">{t("car.editor.subtotalExVat")}</span>
             <span>{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">VAT AMOUNT</span>
+            <span className="text-muted-foreground">{t("car.editor.vatAmount")}</span>
             <span>{formatCurrency(vatAmount)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-border pt-2">
-            <span className="text-muted-foreground">TOTAL INCL VAT</span>
+            <span className="text-muted-foreground">{t("car.editor.totalInclVat")}</span>
             <span className="text-primary">{formatCurrency(totalAmount)}</span>
           </div>
         </div>
@@ -475,7 +485,7 @@ export function ServiceHistoryEditor({
             disabled={isSaving}
             className="bg-primary px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-primary-foreground hover:opacity-90 disabled:opacity-60"
           >
-            {isSaving ? "SAVING..." : submitLabel}
+            {isSaving ? t("car.editor.saving") : submitLabel}
           </button>
 
           {onDelete ? (
@@ -487,14 +497,14 @@ export function ServiceHistoryEditor({
                   onClick={() => void onDelete()}
                   className="px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-destructive hover:underline disabled:opacity-60"
                 >
-                  {isDeleting ? "DELETING..." : "CONFIRM DELETE"}
+                  {isDeleting ? t("car.editor.deleting") : t("car.editor.confirmDelete")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(false)}
                   className="px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
                 >
-                  CANCEL
+                  {t("common.cancel")}
                 </button>
               </>
             ) : (
@@ -503,7 +513,7 @@ export function ServiceHistoryEditor({
                 onClick={() => setConfirmDelete(true)}
                 className="px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-destructive hover:underline"
               >
-                DELETE VISIT
+                {t("car.editor.deleteVisit")}
               </button>
             )
           ) : null}

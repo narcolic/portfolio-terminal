@@ -68,7 +68,7 @@ function LoginPage() {
     return (
       <div className="relative min-h-screen bg-background grid-bg flex items-center justify-center px-4">
         <div className="text-sm uppercase tracking-[0.25em] text-muted-foreground">
-          Loading authentication‚Ä¶
+          Loading authentication...
         </div>
       </div>
     );
@@ -117,7 +117,7 @@ function LoginPage() {
       <div className="relative w-full max-w-md">
         <div className="mb-6 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
           <span>TERMINAL v1.0</span>
-          <span className="text-bull ticker-blink">‚óè LIVE</span>
+          <span className="text-bull ticker-blink">? LIVE</span>
         </div>
 
         <div className="border border-border bg-card">
@@ -144,7 +144,7 @@ function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-input border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-                placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢"
+                placeholder="ïïïïïïïï"
               />
             </Field>
             <button
@@ -202,3 +202,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
+

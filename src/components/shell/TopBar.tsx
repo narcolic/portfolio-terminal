@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { dashboards } from "@/components/shell/dashboards";
+import { useTranslation } from "react-i18next";
 
 function GridIcon() {
   return (
@@ -13,18 +14,16 @@ function GridIcon() {
 }
 
 export function TopBar({ userEmail, onLogout }: { userEmail?: string; onLogout: () => void }) {
+  const { t, i18n } = useTranslation();
   const navItems = dashboards.filter((item) => item.path);
 
   return (
     <div className="sticky top-0 z-10 h-10 w-full border-b border-border bg-card/50 backdrop-blur">
       <div className="flex h-full w-full items-center justify-between px-4 text-[10px] uppercase tracking-[0.2em]">
         <div className="flex h-full items-center">
-          <Link
-            to="/"
-            className="inline-flex h-full items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
+          <Link to="/" className="inline-flex h-full items-center gap-2 text-muted-foreground hover:text-foreground">
             <GridIcon />
-            <span>Terminal Hub</span>
+            <span>{t("shell.hub")}</span>
           </Link>
 
           <span className="mx-3 text-border">|</span>
@@ -32,25 +31,31 @@ export function TopBar({ userEmail, onLogout }: { userEmail?: string; onLogout: 
           <nav className="flex h-full items-stretch">
             {navItems.map((item) => (
               <Link
-                key={item.title}
+                key={item.titleKey}
                 to={item.path!}
                 activeOptions={{ exact: false }}
                 className="inline-flex h-full items-center border-b-2 border-transparent px-3 text-muted-foreground hover:text-foreground"
-                activeProps={{
-                  className:
-                    "inline-flex h-full items-center border-b-2 border-primary px-3 text-primary",
-                }}
+                activeProps={{ className: "inline-flex h-full items-center border-b-2 border-primary px-3 text-primary" }}
               >
-                {item.title}
+                {t(item.titleKey)}
               </Link>
             ))}
           </nav>
         </div>
 
         <div className="flex h-full items-center gap-3 text-muted-foreground">
+          <select
+            value={i18n.language === "el" ? "el" : "en"}
+            onChange={(e) => i18n.changeLanguage(e.target.value)}
+            className="border border-border bg-card px-1 py-0.5 text-[10px] text-foreground uppercase"
+            aria-label={t("common.language")}
+          >
+            <option value="en">EN</option>
+            <option value="el">GR</option>
+          </select>
           <span className="hidden md:inline truncate max-w-[180px]">{userEmail}</span>
           <button onClick={onLogout} className="text-primary hover:underline">
-            [logout]
+            {t("common.logout")}
           </button>
         </div>
       </div>

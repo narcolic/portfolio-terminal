@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { MarketStatusIndicator } from "@/routes/_authenticated/portfolio/components/MarketStatusIndicator";
 import { TopBar } from "@/components/shell/TopBar";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthLayout() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -42,23 +44,23 @@ function AuthLayout() {
   const isCarService = pathname.startsWith("/car-service");
 
   const title = isPortfolio
-    ? "> PORTFOLIO TERMINAL"
+    ? t("header.portfolioTerminal")
     : isCarService
-      ? "> CAR SERVICE"
-      : "> TERMINAL HUB";
+      ? t("header.carService")
+      : t("header.hub");
 
   const desktopLinks = isPortfolio
     ? [
-        { to: "/portfolio", label: "Dashboard", short: "Dash" },
-        { to: "/portfolio/transactions", label: "Transactions", short: "Tx" },
-        { to: "/portfolio/pnl", label: "P&L", short: "P&L" },
+        { to: "/portfolio", label: t("header.dashboard"), short: t("header.dashboard") },
+        { to: "/portfolio/transactions", label: t("header.transactions"), short: t("header.transactions") },
+        { to: "/portfolio/pnl", label: t("header.pnl"), short: t("header.pnl") },
       ]
     : isCarService
       ? [
-          { to: "/car-service", label: "Overview", short: "Home" },
-          { to: "/car-service/history", label: "History", short: "Hist" },
-          { to: "/car-service/analytics", label: "Analytics", short: "Data" },
-          { to: "/car-service/vehicles", label: "Vehicles", short: "Cars" },
+          { to: "/car-service", label: t("header.overview"), short: t("header.overview") },
+          { to: "/car-service/history", label: t("header.history"), short: t("header.history") },
+          { to: "/car-service/analytics", label: t("header.analytics"), short: t("header.analytics") },
+          { to: "/car-service/vehicles", label: t("header.vehicles"), short: t("header.vehicles") },
         ]
       : [];
 

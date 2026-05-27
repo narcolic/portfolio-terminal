@@ -11,6 +11,7 @@ import {
 } from "@/routes/_authenticated/car-service/hooks/useVehicleMutations";
 import { useCarServiceData } from "@/routes/_authenticated/car-service/hooks/useCarServiceData";
 import type { Vehicle } from "@/routes/_authenticated/car-service/types";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/_authenticated/car-service/vehicles")({
   component: VehiclesScreen,
@@ -28,6 +29,7 @@ type EditorState = {
 };
 
 function VehiclesScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { vehicles, isLoading, error, refetch } = useVehicles();
   const { visits } = useCarServiceData();
@@ -80,7 +82,7 @@ function VehiclesScreen() {
     const year = Number(editor.year);
 
     if (!make || !model || !plate || !Number.isFinite(year)) {
-      setInlineError("MAKE, MODEL, YEAR, AND LICENSE PLATE ARE REQUIRED.");
+      setInlineError(t("car.vehicleRequired"));
       return;
     }
 
@@ -111,7 +113,7 @@ function VehiclesScreen() {
       await refetch();
       setEditor(null);
     } catch (e) {
-      setInlineError(e instanceof Error ? e.message : "FAILED TO SAVE VEHICLE.");
+      setInlineError(e instanceof Error ? e.message : t("car.failedSaveVehicle"));
     } finally {
       setBusy(false);
     }
@@ -124,7 +126,7 @@ function VehiclesScreen() {
       await deleteVehicle(supabase, vehicleId);
       await refetch();
     } catch (e) {
-      setInlineError(e instanceof Error ? e.message : "FAILED TO DELETE VEHICLE.");
+      setInlineError(e instanceof Error ? e.message : t("car.failedDeleteVehicle"));
     } finally {
       setBusy(false);
     }
@@ -134,20 +136,20 @@ function VehiclesScreen() {
     <div className="space-y-4 font-mono">
       <div className="border border-border bg-card px-4 py-2">
         <div className="text-[11px] uppercase tracking-[0.2em] text-primary">
-          &gt; CAR-SERVICE // VEHICLES
+          {t("car.vehiclesTitle")}
         </div>
       </div>
 
       <div className="border border-border bg-card p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            REGISTERED VEHICLES
+            {t("car.registeredVehicles")}
           </div>
           <button
             onClick={startCreate}
             className="text-[11px] uppercase tracking-[0.2em] text-primary hover:underline"
           >
-            + ADD VEHICLE
+            {t("car.addVehicle")}
           </button>
         </div>
 
@@ -160,19 +162,19 @@ function VehiclesScreen() {
           <table className="w-full text-[11px]">
             <thead className="bg-secondary/40 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 text-left">MAKE</th>
-                <th className="px-3 py-2 text-left">MODEL</th>
-                <th className="px-3 py-2 text-right">YEAR</th>
-                <th className="px-3 py-2 text-left">LICENSE PLATE</th>
-                <th className="px-3 py-2 text-right">VISITS</th>
-                <th className="px-3 py-2 text-right">ACTIONS</th>
+                <th className="px-3 py-2 text-left">{t("car.make")}</th>
+                <th className="px-3 py-2 text-left">{t("car.model")}</th>
+                <th className="px-3 py-2 text-right">{t("car.year")}</th>
+                <th className="px-3 py-2 text-left">{t("car.licensePlate")}</th>
+                <th className="px-3 py-2 text-right">{t("car.visits")}</th>
+                <th className="px-3 py-2 text-right">{t("car.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr className="border-t border-border/60">
                   <td colSpan={6} className="px-3 py-3 text-muted-foreground">
-                    Loading...
+                    {t("common.loading")}
                   </td>
                 </tr>
               ) : vehicles.length === 0 ? (
@@ -181,7 +183,7 @@ function VehiclesScreen() {
                     colSpan={6}
                     className="px-3 py-6 text-center text-muted-foreground uppercase tracking-[0.2em]"
                   >
-                    NO VEHICLES FOUND
+                    {t("car.noVehiclesFound")}
                   </td>
                 </tr>
               ) : (
@@ -197,14 +199,14 @@ function VehiclesScreen() {
                         onClick={() => startEdit(vehicle)}
                         className="mr-3 uppercase text-primary hover:underline"
                       >
-                        edit
+                        {t("common.edit")}
                       </button>
                       <button
                         onClick={() => void remove(vehicle.id)}
                         disabled={busy}
                         className="uppercase text-destructive hover:underline disabled:opacity-50"
                       >
-                        delete
+                        {t("common.deleteShort")}
                       </button>
                     </td>
                   </tr>
@@ -217,32 +219,32 @@ function VehiclesScreen() {
         {editor ? (
           <div className="border border-border bg-card p-4 mt-2">
             <div className="mb-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {editor.mode === "create" ? "ADD VEHICLE" : "EDIT VEHICLE"}
+              {editor.mode === "create" ? t("car.newVehicle") : t("car.editVehicle")}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field
-                label="MAKE"
+                label={t("car.make")}
                 value={editor.make}
                 onChange={(value) => setEditor((prev) => (prev ? { ...prev, make: value } : prev))}
               />
               <Field
-                label="MODEL"
+                label={t("car.model")}
                 value={editor.model}
                 onChange={(value) => setEditor((prev) => (prev ? { ...prev, model: value } : prev))}
               />
               <Field
-                label="YEAR"
+                label={t("car.year")}
                 type="number"
                 value={editor.year}
                 onChange={(value) => setEditor((prev) => (prev ? { ...prev, year: value } : prev))}
               />
               <Field
-                label="LICENSE PLATE"
+                label={t("car.licensePlate")}
                 value={editor.plate}
                 onChange={(value) => setEditor((prev) => (prev ? { ...prev, plate: value } : prev))}
               />
               <Field
-                label="COLOUR"
+                label={t("car.colour")}
                 value={editor.colour}
                 onChange={(value) =>
                   setEditor((prev) => (prev ? { ...prev, colour: value } : prev))
@@ -250,7 +252,7 @@ function VehiclesScreen() {
               />
               <label className="block md:col-span-2">
                 <div className="mb-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  NOTES
+                  {t("portfolio.notes")}
                 </div>
                 <textarea
                   value={editor.notes}
@@ -268,13 +270,13 @@ function VehiclesScreen() {
                 disabled={busy}
                 className="bg-primary px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-primary-foreground disabled:opacity-60"
               >
-                {busy ? "SAVING..." : "SAVE VEHICLE"}
+                {busy ? t("car.savingVehicle") : t("car.saveVehicle")}
               </button>
               <button
                 onClick={() => setEditor(null)}
                 className="px-4 py-2 text-[11px] uppercase tracking-[0.2em] border border-border"
               >
-                CANCEL
+                {t("common.cancel")}
               </button>
             </div>
           </div>

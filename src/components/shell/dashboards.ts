@@ -1,33 +1,33 @@
 export type DashboardItem = {
-  title: string;
+  titleKey: string;
   path: string | null;
-  description: string;
+  descriptionKey: string;
   placeholder?: boolean;
 };
 
 export type DashboardCategory = {
-  category: string;
+  categoryKey: string;
   items: DashboardItem[];
 };
 
 export const dashboardCategories: DashboardCategory[] = [
   {
-    category: "Finance",
+    categoryKey: "dashboards.finance",
     items: [
       {
-        title: "Portfolio Tracker",
+        titleKey: "dashboards.portfolioTitle",
         path: "/portfolio",
-        description: "Stocks & positions",
+        descriptionKey: "dashboards.portfolioDescription",
       },
       {
-        title: "Car Service & Expenses",
+        titleKey: "dashboards.carServiceTitle",
         path: "/car-service",
-        description: "Maintenance, fuel, and running costs",
+        descriptionKey: "dashboards.carServiceDescription",
       },
       {
-        title: "Energy & Power Bills",
+        titleKey: "dashboards.energyTitle",
         path: null,
-        description: "Bills, usage, and consumption trends",
+        descriptionKey: "dashboards.energyDescription",
         placeholder: true,
       },
     ],

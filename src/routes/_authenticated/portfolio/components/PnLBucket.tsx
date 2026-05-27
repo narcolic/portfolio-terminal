@@ -2,6 +2,7 @@ import { TerminalCard } from "@/components/terminal/TerminalCard";
 import { TerminalTable } from "@/components/terminal/TerminalTable";
 import { enrich } from "@/lib/portfolio/transactions/calculations";
 import { fmt, fmtCurrency, fmtPct } from "@/lib/portfolio/formatters";
+import { useTranslation } from "react-i18next";
 
 export function PnLBucket({
   title,
@@ -14,6 +15,7 @@ export function PnLBucket({
   total: number;
   rows: ReturnType<typeof enrich>;
 }) {
+  const { t } = useTranslation();
   return (
     <TerminalCard
       title={`${title} (${rows.length})`}
@@ -28,7 +30,7 @@ export function PnLBucket({
     >
       <div className={`h-1 ${tone === "bull" ? "bg-bull/40" : "bg-bear/40"}`} />
       {rows.length === 0 ? (
-        <div className="p-6 text-center text-xs text-muted-foreground">Nothing here. Good.</div>
+        <div className="p-6 text-center text-xs text-muted-foreground">{t("portfolio.nothingHere")}</div>
       ) : (
         <TerminalTable>
           <tbody>

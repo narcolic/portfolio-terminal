@@ -7,12 +7,14 @@ import { useCarServiceData } from "@/routes/_authenticated/car-service/hooks/use
 import { createServiceVisit } from "@/routes/_authenticated/car-service/hooks/useCarServiceMutations";
 import { useVehicles } from "@/routes/_authenticated/car-service/hooks/useVehicles";
 import type { ServiceJobInput } from "@/routes/_authenticated/car-service/types";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/_authenticated/car-service/add")({
   component: CarServiceAddVisit,
 });
 
 function CarServiceAddVisit() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { jobSuggestions } = useCarServiceData();
@@ -32,7 +34,7 @@ function CarServiceAddVisit() {
     jobs: ServiceJobInput[];
   }) => {
     if (!user?.id) {
-      setError("Authentication required.");
+      setError(t("car.authRequired"));
       return;
     }
 
@@ -56,7 +58,7 @@ function CarServiceAddVisit() {
 
       await navigate({ to: "/car-service/history" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save visit.");
+      setError(e instanceof Error ? e.message : t("car.failedSaveVisit"));
     } finally {
       setIsSaving(false);
     }
@@ -65,13 +67,13 @@ function CarServiceAddVisit() {
   return (
     <div className="space-y-4 font-mono">
       <div className="border border-border bg-card px-4 py-2">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-primary">&gt; CAR-SERVICE // ADD VISIT</div>
+        <div className="text-[11px] uppercase tracking-[0.2em] text-primary">{t("car.addVisit")}</div>
       </div>
       <ServiceHistoryEditor
         vehicles={vehicles}
         defaultVehicleId={vehicles.length === 1 ? vehicles[0].id : undefined}
         jobSuggestions={jobSuggestions}
-        submitLabel="SAVE VISIT"
+        submitLabel={t("car.saveVisit")}
         saveError={error}
         isSaving={isSaving}
         onSave={handleSave}
